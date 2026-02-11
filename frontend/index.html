@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件共享系统</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5/dist/reset.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        #root {
+            height: 100vh;
+        }
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 200px;
+            background: #001529;
+            color: white;
+            padding: 16px 0;
+        }
+        .logo {
+            height: 32px;
+            margin: 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .nav-item {
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .nav-item:hover {
+            background: #1890ff;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            height: 64px;
+            background: white;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+        }
+        .content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+        .stat-label {
+            color: #666;
+        }
+        .button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        .button:hover {
+            background: #40a9ff;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .table th {
+            background: #fafafa;
+            font-weight: 600;
+        }
+        .file-icon {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 模拟数据
+        const mockFiles = [
+            { id: 1, name: '项目文档.pdf', type: 'file', fileType: 'PDF', size: '2.3 MB', modified: '2024-01-15 14:30' },
+            { id: 2, name: '数据分析.xlsx', type: 'file', fileType: 'Excel', size: '1.1 MB', modified: '2024-01-14 16:45' },
+            { id: 3, name: '图片素材', type: 'folder', fileType: '文件夹', size: '-', modified: '2024-01-13 10:20' },
+            { id: 4, name: '产品介绍.pptx', type: 'file', fileType: 'PowerPoint', size: '5.7 MB', modified: '2024-01-12 09:15' }
+        ];
+
+        const App = () => {
+            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [files, setFiles] = useState(mockFiles);
+
+            const navItems = [
+                { key: 'dashboard', label: '仪表板', icon: '📊' },
+                { key: 'files', label: '文件管理', icon: '📁' },
+                { key: 'search', label: '搜索', icon: '🔍' },
+                { key: 'profile', label: '个人中心', icon: '👤' }
+            ];
+
+            const renderDashboard = () => (
+                <div>
+                    <h1 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24 }}>仪表板</h1>
+                    
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <div className="stat-label">总文件数</div>
+                            <div className="stat-number" style={{ color: '#1890ff' }}>128</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-label">文件夹数</div>
+                            <div className="stat-number" style={{ color: '#52c41a' }}>24</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-label">分享数</div>
+                            <div className="stat-number" style={{ color: '#722ed1' }}>8</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-label">存储使用率</div>
+                            <div className="stat-number" style={{ color: '#1890ff' }}>65%</div>
+                        </div>
+                    </div>
+
+                    <div className="card">
+                        <h2 style={{ marginTop: 0, marginBottom: 16 }}>快捷操作</h2>
+                        <button className="button">上传文件</button>
+                        <button className="button">新建文件夹</button>
+                        <button className="button">创建分享</button>
+                    </div>
+
+                    <div className="card">
+                        <h2 style={{ marginTop: 0, marginBottom: 16 }}>最近文件</h2>
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th>名称</th>
+                                    <th>类型</th>
+                                    <th>大小</th>
+                                    <th>修改时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {files.slice(0, 3).map(file => (
+                                    <tr key={file.id}>
+                                        <td>
+                                            <span className="file-icon">{file.type === 'folder' ? '📁' : '📄'}</span>
+                                            {file.name}
+                                        </td>
+                                        <td>{file.fileType}</td>
+                                        <td>{file.size}</td>
+                                        <td>{file.modified}</td>
+                                        <td>
+                                            <button style={{background: '#52c41a', marginRight: 8}}>下载</button>
+                                            <button style={{background: '#1890ff'}}>预览</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+
+            const renderFileManager = () => (
+                <div>
+                    <h1 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24 }}>文件管理</h1>
+                    
+                    <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+                        <div>
+                            <button className="button">新建文件夹</button>
+                            <button className="button">上传文件</button>
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder="搜索文件..." 
+                            style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
+                        />
+                    </div>
+
+                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th>名称</th>
+                                    <th>类型</th>
+                                    <th>大小</th>
+                                    <th>修改时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {files.map(file => (
+                                    <tr key={file.id}>
+                                        <td>
+                                            <span className="file-icon">{file.type === 'folder' ? '📁' : '📄'}</span>
+                                            {file.name}
+                                        </td>
+                                        <td>{file.fileType}</td>
+                                        <td>{file.size}</td>
+                                        <td>{file.modified}</td>
+                                        <td>
+                                            <button style={{background: '#52c41a', marginRight: 8, border: 'none', padding: '4px 8px', borderRadius: '4px', color: 'white', cursor: 'pointer'}}>下载</button>
+                                            <button style={{background: '#1890ff', border: 'none', padding: '4px 8px', borderRadius: '4px', color: 'white', cursor: 'pointer'}}>预览</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+
+            const renderContent = () => {
+                switch(currentPage) {
+                    case 'dashboard':
+                        return renderDashboard();
+                    case 'files':
+                        return renderFileManager();
+                    case 'search':
+                        return <h1>搜索功能</h1>;
+                    case 'profile':
+                        return <h1>个人中心</h1>;
+                    default:
+                        return renderDashboard();
+                }
+            };
+
+            return (
+                <div className="app-container">
+                    <div className="sidebar">
+                        <div className="logo">文件共享系统</div>
+                        {navItems.map(item => (
+                            <div 
+                                key={item.key}
+                                className="nav-item"
+                                onClick={() => setCurrentPage(item.key)}
+                                style={{ 
+                                    background: currentPage === item.key ? '#1890ff' : 'transparent'
+                                }}
+                            >
+                                <span style={{ marginRight: 8 }}>{item.icon}</span>
+                                {item.label}
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="main-content">
+                        <div className="header">
+                            <div>欢迎回来，用户</div>
+                            <div>
+                                <span style={{ marginRight: 16 }}>🔔 通知(3)</span>
+                                <button style={{background: '#ff4d4f', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px'}}>退出登录</button>
+                            </div>
+                        </div>
+                        
+                        <div className="content">
+                            {renderContent()}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
