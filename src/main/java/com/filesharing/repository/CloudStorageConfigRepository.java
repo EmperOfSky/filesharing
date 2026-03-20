@@ -27,6 +27,16 @@ public interface CloudStorageConfigRepository extends JpaRepository<CloudStorage
     List<CloudStorageConfig> findEnabledConfigs();
     
     /**
+     * 查找启用的配置（方法命名方式）
+     */
+    List<CloudStorageConfig> findByIsEnabledTrue();
+    
+    /**
+     * 查找第一个启用的默认配置
+     */
+    Optional<CloudStorageConfig> findFirstByIsDefaultTrueAndIsEnabledTrue();
+    
+    /**
      * 查找默认存储配置
      */
     @Query("SELECT csc FROM CloudStorageConfig csc WHERE csc.isDefault = true AND csc.isEnabled = true")
@@ -71,4 +81,10 @@ public interface CloudStorageConfigRepository extends JpaRepository<CloudStorage
      */
     @Query("SELECT csc FROM CloudStorageConfig csc WHERE csc.connectionStatus = 'FAILED'")
     List<CloudStorageConfig> findFailedConnectionConfigs();
+    
+    /**
+     * 重置所有配置的默认状态
+     */
+    @Query("UPDATE CloudStorageConfig csc SET csc.isDefault = false")
+    void resetDefaultConfig();
 }

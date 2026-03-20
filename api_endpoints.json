@@ -1,0 +1,730 @@
+﻿[
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "GET",
+        "Path":  "/api/ai/analyze-behavior",
+        "Line":  306
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/analyze-file",
+        "Line":  177
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/classify-text",
+        "Line":  140
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/document-summary",
+        "Line":  38
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/keywords",
+        "Line":  400
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "GET",
+        "Path":  "/api/ai/models",
+        "Line":  425
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/question-answer",
+        "Line":  74
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/recognize-image",
+        "Line":  209
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/recommend-tags",
+        "Line":  238
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/sentiment",
+        "Line":  377
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/similarity",
+        "Line":  323
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "GET",
+        "Path":  "/api/ai/smart-search",
+        "Line":  265
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/summarize",
+        "Line":  352
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/test-model/{modelId}",
+        "Line":  452
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AIController.java",
+        "Controller":  "AIController",
+        "Method":  "POST",
+        "Path":  "/api/ai/text-correction",
+        "Line":  107
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AuthController.java",
+        "Controller":  "AuthController",
+        "Method":  "POST",
+        "Path":  "/api/auth/debug-login",
+        "Line":  94
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AuthController.java",
+        "Controller":  "AuthController",
+        "Method":  "POST",
+        "Path":  "/api/auth/login",
+        "Line":  58
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AuthController.java",
+        "Controller":  "AuthController",
+        "Method":  "GET",
+        "Path":  "/api/auth/me",
+        "Line":  103
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\AuthController.java",
+        "Controller":  "AuthController",
+        "Method":  "POST",
+        "Path":  "/api/auth/register",
+        "Line":  29
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "DELETE",
+        "Path":  "/api/backup/{backupPath}",
+        "Line":  140
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "POST",
+        "Path":  "/api/backup/async",
+        "Line":  71
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "DELETE",
+        "Path":  "/api/backup/cleanup",
+        "Line":  177
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "GET",
+        "Path":  "/api/backup/config/export",
+        "Line":  260
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "POST",
+        "Path":  "/api/backup/config/import",
+        "Line":  283
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "POST",
+        "Path":  "/api/backup/full",
+        "Line":  34
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "POST",
+        "Path":  "/api/backup/incremental",
+        "Line":  52
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "GET",
+        "Path":  "/api/backup/list",
+        "Line":  124
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "POST",
+        "Path":  "/api/backup/restore",
+        "Line":  106
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "GET",
+        "Path":  "/api/backup/statistics",
+        "Line":  194
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "GET",
+        "Path":  "/api/backup/task/{taskId}",
+        "Line":  156
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\BackupController.java",
+        "Controller":  "BackupController",
+        "Method":  "POST",
+        "Path":  "/api/backup/validate",
+        "Line":  237
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "GET",
+        "Path":  "/api/cloud-storage/configs",
+        "Line":  61
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "POST",
+        "Path":  "/api/cloud-storage/configs",
+        "Line":  30
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "DELETE",
+        "Path":  "/api/cloud-storage/configs/{configId}",
+        "Line":  120
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "GET",
+        "Path":  "/api/cloud-storage/configs/{configId}",
+        "Line":  45
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "PUT",
+        "Path":  "/api/cloud-storage/configs/{configId}",
+        "Line":  104
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "POST",
+        "Path":  "/api/cloud-storage/configs/{configId}/test-connection",
+        "Line":  135
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "GET",
+        "Path":  "/api/cloud-storage/configs/{configId}/usage",
+        "Line":  157
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "GET",
+        "Path":  "/api/cloud-storage/configs/default",
+        "Line":  90
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "GET",
+        "Path":  "/api/cloud-storage/configs/enabled",
+        "Line":  76
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\CloudStorageController.java",
+        "Controller":  "CloudStorageController",
+        "Method":  "GET",
+        "Path":  "/api/cloud-storage/configs/info",
+        "Line":  179
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\DemoController.java",
+        "Controller":  "DemoController",
+        "Method":  "GET",
+        "Path":  "/api/demo/health",
+        "Line":  21
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\DemoController.java",
+        "Controller":  "DemoController",
+        "Method":  "GET",
+        "Path":  "/api/demo/info",
+        "Line":  38
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\DemoController.java",
+        "Controller":  "DemoController",
+        "Method":  "POST",
+        "Path":  "/api/demo/register",
+        "Line":  26
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\FileController.java",
+        "Controller":  "FileController",
+        "Method":  "DELETE",
+        "Path":  "/api/files/{fileId}",
+        "Line":  126
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\FileController.java",
+        "Controller":  "FileController",
+        "Method":  "GET",
+        "Path":  "/api/files/{fileId}",
+        "Line":  90
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\FileController.java",
+        "Controller":  "FileController",
+        "Method":  "GET",
+        "Path":  "/api/files/{fileId}/download",
+        "Line":  57
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\FileController.java",
+        "Controller":  "FileController",
+        "Method":  "GET",
+        "Path":  "/api/files/my",
+        "Line":  106
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\FileController.java",
+        "Controller":  "FileController",
+        "Method":  "GET",
+        "Path":  "/api/files/public",
+        "Line":  144
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\FileController.java",
+        "Controller":  "FileController",
+        "Method":  "POST",
+        "Path":  "/api/files/upload",
+        "Line":  37
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/enhanced/activity/recent",
+        "Line":  153
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/enhanced/announcements",
+        "Line":  278
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/enhanced/config",
+        "Line":  179
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "POST",
+        "Path":  "/api/mobile/enhanced/feedback",
+        "Line":  255
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/enhanced/files/{fileId}/preview-info",
+        "Line":  57
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/enhanced/files/{fileId}/thumbnail-info",
+        "Line":  37
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "POST",
+        "Path":  "/api/mobile/enhanced/files/batch-operate",
+        "Line":  77
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/enhanced/storage/usage",
+        "Line":  116
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "POST",
+        "Path":  "/api/mobile/enhanced/sync",
+        "Line":  96
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileEnhancedController.java",
+        "Controller":  "MobileEnhancedController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/enhanced/version/check",
+        "Line":  223
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFileController.java",
+        "Controller":  "MobileFileController",
+        "Method":  "DELETE",
+        "Path":  "/api/mobile/files/{fileId}/favorite",
+        "Line":  74
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFileController.java",
+        "Controller":  "MobileFileController",
+        "Method":  "POST",
+        "Path":  "/api/mobile/files/{fileId}/favorite",
+        "Line":  58
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFileController.java",
+        "Controller":  "MobileFileController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/files/favorites",
+        "Line":  43
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFileController.java",
+        "Controller":  "MobileFileController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/files/offline-available",
+        "Line":  106
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFileController.java",
+        "Controller":  "MobileFileController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/files/recent",
+        "Line":  28
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFileController.java",
+        "Controller":  "MobileFileController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/files/search",
+        "Line":  90
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFolderController.java",
+        "Controller":  "MobileFolderController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/folders",
+        "Line":  28
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFolderController.java",
+        "Controller":  "MobileFolderController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/folders/{folderId}/breadcrumb",
+        "Line":  59
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFolderController.java",
+        "Controller":  "MobileFolderController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/folders/{folderId}/subfolders",
+        "Line":  43
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileFolderController.java",
+        "Controller":  "MobileFolderController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/folders/quick-access",
+        "Line":  75
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileUploadController.java",
+        "Controller":  "MobileUploadController",
+        "Method":  "POST",
+        "Path":  "/api/mobile/upload",
+        "Line":  29
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileUploadController.java",
+        "Controller":  "MobileUploadController",
+        "Method":  "POST",
+        "Path":  "/api/mobile/upload/chunk",
+        "Line":  52
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileUploadController.java",
+        "Controller":  "MobileUploadController",
+        "Method":  "POST",
+        "Path":  "/api/mobile/upload/init-chunk",
+        "Line":  72
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\mobile\\MobileUploadController.java",
+        "Controller":  "MobileUploadController",
+        "Method":  "GET",
+        "Path":  "/api/mobile/upload/progress/{uploadId}",
+        "Line":  90
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "GET",
+        "Path":  "/api/monitoring/alerts",
+        "Line":  94
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "PUT",
+        "Path":  "/api/monitoring/alerts/{alertId}/close",
+        "Line":  118
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "POST",
+        "Path":  "/api/monitoring/alerts/test",
+        "Line":  133
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "DELETE",
+        "Path":  "/api/monitoring/cleanup",
+        "Line":  153
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "GET",
+        "Path":  "/api/monitoring/health",
+        "Line":  46
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "GET",
+        "Path":  "/api/monitoring/metrics",
+        "Line":  32
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "GET",
+        "Path":  "/api/monitoring/metrics/history",
+        "Line":  61
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "GET",
+        "Path":  "/api/monitoring/report",
+        "Line":  78
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\MonitoringController.java",
+        "Controller":  "MonitoringController",
+        "Method":  "GET",
+        "Path":  "/api/monitoring/statistics",
+        "Line":  175
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/{fileId}",
+        "Line":  34
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/{fileId}/content",
+        "Line":  59
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/{fileId}/image",
+        "Line":  121
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/{fileId}/pdf",
+        "Line":  104
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/{fileId}/statistics",
+        "Line":  141
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/{fileId}/text",
+        "Line":  89
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/popular",
+        "Line":  176
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\PreviewController.java",
+        "Controller":  "PreviewController",
+        "Method":  "GET",
+        "Path":  "/api/preview/user/statistics",
+        "Line":  158
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\RecommendationController.java",
+        "Controller":  "RecommendationController",
+        "Method":  "GET",
+        "Path":  "/api/recommendations",
+        "Line":  57
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\RecommendationController.java",
+        "Controller":  "RecommendationController",
+        "Method":  "PUT",
+        "Path":  "/api/recommendations/{id}/adopt",
+        "Line":  105
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\RecommendationController.java",
+        "Controller":  "RecommendationController",
+        "Method":  "PUT",
+        "Path":  "/api/recommendations/{id}/view",
+        "Line":  85
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\RecommendationController.java",
+        "Controller":  "RecommendationController",
+        "Method":  "GET",
+        "Path":  "/api/recommendations/analytics",
+        "Line":  125
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\RecommendationController.java",
+        "Controller":  "RecommendationController",
+        "Method":  "DELETE",
+        "Path":  "/api/recommendations/cleanup",
+        "Line":  165
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\RecommendationController.java",
+        "Controller":  "RecommendationController",
+        "Method":  "POST",
+        "Path":  "/api/recommendations/generate",
+        "Line":  38
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\RecommendationController.java",
+        "Controller":  "RecommendationController",
+        "Method":  "GET",
+        "Path":  "/api/recommendations/similar/{itemId}",
+        "Line":  144
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\upload\\ChunkUploadController.java",
+        "Controller":  "ChunkUploadController",
+        "Method":  "POST",
+        "Path":  "/api/upload/chunk",
+        "Line":  110
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\upload\\ChunkUploadController.java",
+        "Controller":  "ChunkUploadController",
+        "Method":  "POST",
+        "Path":  "/api/upload/chunk/complete",
+        "Line":  158
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\upload\\ChunkUploadController.java",
+        "Controller":  "ChunkUploadController",
+        "Method":  "POST",
+        "Path":  "/api/upload/chunk/init",
+        "Line":  64
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\UserController.java",
+        "Controller":  "UserController",
+        "Method":  "POST",
+        "Path":  "/api/users/change-password",
+        "Line":  75
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\UserController.java",
+        "Controller":  "UserController",
+        "Method":  "GET",
+        "Path":  "/api/users/profile",
+        "Line":  36
+    },
+    {
+        "File":  "C:\\Users\\Admin\\Desktop\\filesharing\\src\\main\\java\\com\\filesharing\\controller\\UserController.java",
+        "Controller":  "UserController",
+        "Method":  "PUT",
+        "Path":  "/api/users/profile",
+        "Line":  49
+    }
+]

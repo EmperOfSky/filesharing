@@ -14,6 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.servlet.http.HttpServletRequest;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -214,6 +216,27 @@ public class UserServiceImpl implements UserService {
     public User findUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public User getCurrentUser(HttpServletRequest request) {
+        // 从请求头中获取JWT token
+        String authorizationHeader = request.getHeader("Authorization");
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new BusinessException("未提供有效的认证令牌");
+        }
+        
+        String token = authorizationHeader.substring(7); // 移除 "Bearer " 前缀
+        
+        try {
+            // 验证token并获取用户ID
+            Long userId = jwtUtil.getUserIdFromToken(token);
+            return findUserById(userId);
+        } catch (Exception e) {
+            log.error("Token验证失败: {}", e.getMessage());
+            throw new BusinessException("无效的认证令牌");
+        }
     }
     
     /**

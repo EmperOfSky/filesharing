@@ -124,8 +124,6 @@ public class MobileFileController {
     
     // 辅助方法：从请求中获取当前用户
     private User getCurrentUser(HttpServletRequest request) {
-        // 这里应该从JWT token中解析用户信息
-        // 暂时返回示例用户，实际应用中需要实现JWT解析
-        return userService.findUserById(1L); // 示例用户ID
+        return userService.getCurrentUser(request);
     }
 }

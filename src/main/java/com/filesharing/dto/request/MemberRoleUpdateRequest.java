@@ -1,10 +1,20 @@
 package com.filesharing.dto.request;
 
 import lombok.Data;
-import javax.validation.constraints.NotNull;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+import javax.validation.constraints.NotBlank;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MemberRoleUpdateRequest {
-    @NotNull(message = "角色不能为空")
-    private String role; // ADMIN, EDITOR, VIEWER
+    
+    @NotBlank(message = "角色不能为空")
+    private String role;
+    
+    private String permissions;
 }

@@ -66,7 +66,7 @@ mvn spring-boot:run
 ```
 src/main/java/com/filesharing/
 ├── controller/          # 控制层
-│   ├── AuthController.java         # 认证接口
+ │   ├── AuthController.java         # 认证接口
 │   ├── FileController.java         # 文件管理接口
 │   ├── mobile/                     # 移动端接口
 │   └── AIController.java           # AI功能接口
@@ -294,4 +294,275 @@ A: 确保AI模型配置正确，网络连接正常
 - Apache Tika
 
 ---
+
 **文件共享系统** - 让文件协作变得更简单！ 🚀
+
+## 🔗 前端集成与示例代码
+
+本项目后端采用 JWT 鉴权，所有需要用户身份的请求必须在 HTTP Header 中携带：
+
+- Authorization: Bearer <token>
+
+下列为前端需要关注的后端接口（与示例）：
+
+1) 分片上传（Chunked Upload）
+- 初始化分片上传：POST /api/upload/chunk/init  (参数: filename) -> 返回 { uploadId }
+- 上传分片：POST /api/upload/chunk (参数: uploadId, chunkIndex, chunk MultipartFile)
+- 完成合并：POST /api/upload/chunk/complete (参数: uploadId, filename, 可选 contentType)
+
+示例 JavaScript（浏览器端）:
+
+```javascript
+// 简化示例：按顺序上传分片（不处理断点续传/重试）
+async function uploadFileInChunks(file, token) {
+  const filename = file.name;
+  // init
+  const initResp = await fetch('/api/upload/chunk/init', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ filename })
+  });
+  const initJson = await initResp.json();
+  const uploadId = initJson.uploadId;
+
+  const chunkSize = 5 * 1024 * 1024; // 前端可与后端配置对齐
+  let chunkIndex = 0;
+  for (let start = 0; start < file.size; start += chunkSize) {
+    const end = Math.min(start + chunkSize, file.size);
+    const part = file.slice(start, end);
+    const form = new FormData();
+    form.append('uploadId', uploadId);
+    form.append('chunkIndex', chunkIndex);
+    form.append('chunk', part, filename);
+
+    await fetch('/api/upload/chunk', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form
+    });
+
+    chunkIndex++;
+  }
+
+  // complete
+  const completeForm = new FormData();
+  completeForm.append('uploadId', uploadId);
+  completeForm.append('filename', filename);
+  completeForm.append('contentType', file.type || 'application/octet-stream');
+
+  const completeResp = await fetch('/api/upload/chunk/complete', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token },
+    body: completeForm
+  });
+
+  return await completeResp.json();
+}
+```
+
+2) 常用前端接口使用约定
+- 需在每次请求中带上 Authorization: Bearer <token>。
+- 上传时请先确认后端配置：
+  - upload.chunk.max-size（单分片上限）
+  - upload.file.max-size（单文件上限）
+  - upload.allowed-types-csv（允许的 MIME 类型，逗号分隔）
+
+3) 推荐实践
+- 在上传时做分片重试与并发控制（例如最多并发 3-4 个分片）。
+- 在合并完成后，前端可比较后端返回的 sha256 值进行完整性校验。
+- 定期清理挂起的临时分片目录由后端的 UploadCleanupTask 负责（默认 24 小时）。
+
+## ✅ 运行与验证（新增）
+
+下面步骤可以帮助你在开发环境快速启动并验证系统的关键功能（包括分片上传与断点续传）。
+
+1) 环境准备
+- Java 17 或更高，Maven 3.6+。
+- Node.js 16+（若前端需要本地开发）。
+- 在项目根目录确保 `uploads/` 与 `temp/` 目录存在或可被应用创建，并赋予读写权限。
+- 在 `src/main/resources/application.yml` 中配置一个稳定的 `jwt.secret`，例如：
+
+```yaml
+jwt:
+  secret: change-this-to-a-strong-secret
+  expiration: 86400000
+```
+
+2) 后端启动
+- 在项目根：
+
+```powershell
+mvn clean compile
+mvn spring-boot:run
+```
+
+- 后端默认运行在 http://localhost:8080
+
+3) 前端启动（可选，本地开发）
+- 进入 `frontend` 目录，安装依赖并启动：
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+- 若前端通过 Vite 在其他端口运行，请确保已配置代理或后端允许 CORS。
+
+4) 快速验证：认证与分片上传
+- 使用 Postman / curl 或前端页面执行登录，获取 JWT token。
+  - 登录接口：POST /api/auth/login，返回 token（确保 `jwt.secret` 一致）。
+- 使用 token 调用初始化接口并检查已存在分片（支持断点续传）：
+
+```powershell
+# 假设 TOKEN 环境变量已设置
+curl -X POST "http://localhost:8080/api/upload/chunk/init" -H "Authorization: Bearer $TOKEN" -d "filename=test.bin"
+```
+
+返回示例：
+
+```json
+{
+  "uploadId": "...",
+  "filename": "test.bin",
+  "existingParts": [0,1,2]
+}
+```
+
+- 按照返回的 uploadId 上传分片：
+
+```powershell
+# 上传第0片
+curl -X POST "http://localhost:8080/api/upload/chunk" -H "Authorization: Bearer $TOKEN" -F "uploadId=<uploadId>" -F "chunkIndex=0" -F "chunk=@part0.bin"
+```
+
+- 上传所有需要的分片后调用合并接口：
+
+```powershell
+curl -X POST "http://localhost:8080/api/upload/chunk/complete" -H "Authorization: Bearer $TOKEN" -F "uploadId=<uploadId>" -F "filename=test.bin" -F "contentType=application/octet-stream"
+```
+
+返回示例包含 `fileId` 与可选的 `sha256` 校验值。
+
+5) 常见问题与排查
+- 无法认证/401：确认 `jwt.secret` 是否在 `application.yml` 中配置且服务已重启；前端需在每次请求头中带上 `Authorization: Bearer <token>`。
+- 前端不带 token：项目中部分位置可能使用 `localStorage['token']` 或 `localStorage['auth-storage']` 存储 token，我已将关键上传路径使用 `token` 作为主键。建议全仓统一为 `token`。
+- 临时分片未清理：UploadCleanupTask 默认每小时运行并删除超过配置期限的临时目录。你可以在 `application.yml` 中配置 `upload.cleanup.expire-hours`。
+- 数据丢失：开发配置使用 H2 的 create-drop，生产环境请配置持久化数据库并使用迁移脚本（Flyway/Liquibase）。
+
+---
+
+## 全量 API 接口清单（自动扫描）
+
+> 扫描来源：`src/main/java/**` 控制器与上传控制器注解。  
+> 联调方式：后端直连 `http://localhost:8080` 与前端代理 `http://localhost:3001` 双通道冒烟。
+
+- 本次扫描接口总数：104
+- 双通道可达接口：104/104
+
+| Method | Path | Controller | BackendStatus | ProxyStatus |
+|---|---|---|---:|---:|
+| DELETE | /api/backup/{backupPath} | BackupController | 403 | 403 |
+| DELETE | /api/backup/cleanup | BackupController | 403 | 403 |
+| DELETE | /api/cloud-storage/configs/{configId} | CloudStorageController | 403 | 403 |
+| DELETE | /api/files/{fileId} | FileController | 403 | 403 |
+| DELETE | /api/mobile/files/{fileId}/favorite | MobileFileController | 403 | 403 |
+| DELETE | /api/monitoring/cleanup | MonitoringController | 403 | 403 |
+| DELETE | /api/recommendations/cleanup | RecommendationController | 403 | 403 |
+| GET | /api/ai/analyze-behavior | AIController | 403 | 403 |
+| GET | /api/ai/models | AIController | 403 | 403 |
+| GET | /api/ai/smart-search | AIController | 403 | 403 |
+| GET | /api/auth/me | AuthController | 401 | 401 |
+| GET | /api/backup/config/export | BackupController | 403 | 403 |
+| GET | /api/backup/list | BackupController | 403 | 403 |
+| GET | /api/backup/statistics | BackupController | 403 | 403 |
+| GET | /api/backup/task/{taskId} | BackupController | 403 | 403 |
+| GET | /api/cloud-storage/configs | CloudStorageController | 403 | 403 |
+| GET | /api/cloud-storage/configs/{configId} | CloudStorageController | 403 | 403 |
+| GET | /api/cloud-storage/configs/{configId}/usage | CloudStorageController | 403 | 403 |
+| GET | /api/cloud-storage/configs/default | CloudStorageController | 403 | 403 |
+| GET | /api/cloud-storage/configs/enabled | CloudStorageController | 403 | 403 |
+| GET | /api/cloud-storage/configs/info | CloudStorageController | 403 | 403 |
+| GET | /api/demo/health | DemoController | 403 | 403 |
+| GET | /api/demo/info | DemoController | 403 | 403 |
+| GET | /api/files/{fileId} | FileController | 403 | 403 |
+| GET | /api/files/{fileId}/download | FileController | 403 | 403 |
+| GET | /api/files/my | FileController | 403 | 403 |
+| GET | /api/files/public | FileController | 200 | 200 |
+| GET | /api/mobile/enhanced/activity/recent | MobileEnhancedController | 403 | 403 |
+| GET | /api/mobile/enhanced/announcements | MobileEnhancedController | 403 | 403 |
+| GET | /api/mobile/enhanced/config | MobileEnhancedController | 403 | 403 |
+| GET | /api/mobile/enhanced/files/{fileId}/preview-info | MobileEnhancedController | 403 | 403 |
+| GET | /api/mobile/enhanced/files/{fileId}/thumbnail-info | MobileEnhancedController | 403 | 403 |
+| GET | /api/mobile/enhanced/storage/usage | MobileEnhancedController | 403 | 403 |
+| GET | /api/mobile/enhanced/version/check | MobileEnhancedController | 403 | 403 |
+| GET | /api/mobile/files/favorites | MobileFileController | 403 | 403 |
+| GET | /api/mobile/files/offline-available | MobileFileController | 403 | 403 |
+| GET | /api/mobile/files/recent | MobileFileController | 403 | 403 |
+| GET | /api/mobile/files/search | MobileFileController | 403 | 403 |
+| GET | /api/mobile/folders | MobileFolderController | 403 | 403 |
+| GET | /api/mobile/folders/{folderId}/breadcrumb | MobileFolderController | 403 | 403 |
+| GET | /api/mobile/folders/{folderId}/subfolders | MobileFolderController | 403 | 403 |
+| GET | /api/mobile/folders/quick-access | MobileFolderController | 403 | 403 |
+| GET | /api/mobile/upload/progress/{uploadId} | MobileUploadController | 403 | 403 |
+| GET | /api/monitoring/alerts | MonitoringController | 403 | 403 |
+| GET | /api/monitoring/health | MonitoringController | 403 | 403 |
+| GET | /api/monitoring/metrics | MonitoringController | 403 | 403 |
+| GET | /api/monitoring/metrics/history | MonitoringController | 403 | 403 |
+| GET | /api/monitoring/report | MonitoringController | 403 | 403 |
+| GET | /api/monitoring/statistics | MonitoringController | 403 | 403 |
+| GET | /api/preview/{fileId} | PreviewController | 403 | 403 |
+| GET | /api/preview/{fileId}/content | PreviewController | 403 | 403 |
+| GET | /api/preview/{fileId}/image | PreviewController | 403 | 403 |
+| GET | /api/preview/{fileId}/pdf | PreviewController | 403 | 403 |
+| GET | /api/preview/{fileId}/statistics | PreviewController | 403 | 403 |
+| GET | /api/preview/{fileId}/text | PreviewController | 403 | 403 |
+| GET | /api/preview/popular | PreviewController | 403 | 403 |
+| GET | /api/preview/user/statistics | PreviewController | 403 | 403 |
+| GET | /api/recommendations | RecommendationController | 403 | 403 |
+| GET | /api/recommendations/analytics | RecommendationController | 403 | 403 |
+| GET | /api/recommendations/similar/{itemId} | RecommendationController | 403 | 403 |
+| GET | /api/users/profile | UserController | 403 | 403 |
+| POST | /api/ai/analyze-file | AIController | 403 | 403 |
+| POST | /api/ai/classify-text | AIController | 403 | 403 |
+| POST | /api/ai/document-summary | AIController | 403 | 403 |
+| POST | /api/ai/keywords | AIController | 403 | 403 |
+| POST | /api/ai/question-answer | AIController | 403 | 403 |
+| POST | /api/ai/recognize-image | AIController | 403 | 403 |
+| POST | /api/ai/recommend-tags | AIController | 403 | 403 |
+| POST | /api/ai/sentiment | AIController | 403 | 403 |
+| POST | /api/ai/similarity | AIController | 403 | 403 |
+| POST | /api/ai/summarize | AIController | 403 | 403 |
+| POST | /api/ai/test-model/{modelId} | AIController | 403 | 403 |
+| POST | /api/ai/text-correction | AIController | 403 | 403 |
+| POST | /api/auth/debug-login | AuthController | 400 | 400 |
+| POST | /api/auth/login | AuthController | 400 | 400 |
+| POST | /api/auth/register | AuthController | 400 | 400 |
+| POST | /api/backup/async | BackupController | 403 | 403 |
+| POST | /api/backup/config/import | BackupController | 403 | 403 |
+| POST | /api/backup/full | BackupController | 403 | 403 |
+| POST | /api/backup/incremental | BackupController | 403 | 403 |
+| POST | /api/backup/restore | BackupController | 403 | 403 |
+| POST | /api/backup/validate | BackupController | 403 | 403 |
+| POST | /api/cloud-storage/configs | CloudStorageController | 403 | 403 |
+| POST | /api/cloud-storage/configs/{configId}/test-connection | CloudStorageController | 403 | 403 |
+| POST | /api/demo/register | DemoController | 403 | 403 |
+| POST | /api/files/upload | FileController | 403 | 403 |
+| POST | /api/mobile/enhanced/feedback | MobileEnhancedController | 403 | 403 |
+| POST | /api/mobile/enhanced/files/batch-operate | MobileEnhancedController | 403 | 403 |
+| POST | /api/mobile/enhanced/sync | MobileEnhancedController | 403 | 403 |
+| POST | /api/mobile/files/{fileId}/favorite | MobileFileController | 403 | 403 |
+| POST | /api/mobile/upload | MobileUploadController | 403 | 403 |
+| POST | /api/mobile/upload/chunk | MobileUploadController | 403 | 403 |
+| POST | /api/mobile/upload/init-chunk | MobileUploadController | 403 | 403 |
+| POST | /api/monitoring/alerts/test | MonitoringController | 403 | 403 |
+| POST | /api/recommendations/generate | RecommendationController | 403 | 403 |
+| POST | /api/upload/chunk | ChunkUploadController | 403 | 403 |
+| POST | /api/upload/chunk/complete | ChunkUploadController | 403 | 403 |
+| POST | /api/upload/chunk/init | ChunkUploadController | 403 | 403 |
+| POST | /api/users/change-password | UserController | 403 | 403 |
+| PUT | /api/cloud-storage/configs/{configId} | CloudStorageController | 403 | 403 |
+| PUT | /api/monitoring/alerts/{alertId}/close | MonitoringController | 403 | 403 |
+| PUT | /api/recommendations/{id}/adopt | RecommendationController | 403 | 403 |
+| PUT | /api/recommendations/{id}/view | RecommendationController | 403 | 403 |
+| PUT | /api/users/profile | UserController | 403 | 403 |

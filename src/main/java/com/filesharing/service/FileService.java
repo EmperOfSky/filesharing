@@ -49,6 +49,11 @@ public interface FileService {
      * 重命名文件
      */
     FileResponse renameFile(Long fileId, String newName, User currentUser);
+
+    /**
+     * 复制文件到目标文件夹
+     */
+    FileResponse copyFile(Long fileId, Long targetFolderId, User currentUser);
     
     /**
      * 设置文件公开状态
@@ -79,6 +84,23 @@ public interface FileService {
      * 清理已删除的文件
      */
     void cleanupDeletedFiles();
+    
+    /**
+     * 分片上传初始化
+     */
+    FileUploadResponse initChunkUpload(String fileName, Long fileSize, Long chunkSize, 
+                                     Integer totalChunks, Long folderId, User uploader);
+    
+    /**
+     * 上传分片
+     */
+    FileUploadResponse uploadChunk(MultipartFile chunk, String uploadId, Integer chunkIndex, 
+                                 Integer totalChunks, User uploader);
+    
+    /**
+     * 获取上传进度
+     */
+    Double getUploadProgress(String uploadId);
     
     // 移动端专用方法
     

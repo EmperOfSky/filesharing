@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -51,4 +52,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     @Query("SELECT COUNT(u) FROM User u WHERE u.status = 'ACTIVE'")
     Long countActiveUsers();
+    
+    /**
+     * 查找指定时间之后创建的用户
+     */
+    Iterable<User> findByCreatedAtAfter(LocalDateTime sinceTime);
 }

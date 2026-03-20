@@ -87,6 +87,30 @@ public class FileEntity {
     private Integer downloadCount = 0;
     
     /**
+     * 预览次数
+     */
+    @Column(name = "preview_count")
+    private Integer previewCount = 0;
+    
+    /**
+     * 分享次数
+     */
+    @Column(name = "share_count")
+    private Integer shareCount = 0;
+    
+    /**
+     * 最后下载时间
+     */
+    @Column(name = "last_download_at")
+    private LocalDateTime lastDownloadAt;
+    
+    /**
+     * 最后预览时间
+     */
+    @Column(name = "last_preview_at")
+    private LocalDateTime lastPreviewAt;
+    
+    /**
      * 上传者ID
      */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -135,4 +159,68 @@ public class FileEntity {
         AVAILABLE,  // 可用
         DELETED     // 已删除
     }
+    
+    // 手动添加getter/setter方法
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public String getOriginalName() { return originalName; }
+    public void setOriginalName(String originalName) { this.originalName = originalName; }
+    
+    public String getStorageName() { return storageName; }
+    public void setStorageName(String storageName) { this.storageName = storageName; }
+    
+    public String getFilePath() { return filePath; }
+    public void setFilePath(String filePath) { this.filePath = filePath; }
+    
+    public Long getFileSize() { return fileSize; }
+    public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
+    
+    public String getContentType() { return contentType; }
+    public void setContentType(String contentType) { this.contentType = contentType; }
+    
+    public String getExtension() { return extension; }
+    public void setExtension(String extension) { this.extension = extension; }
+    
+    public String getMd5Hash() { return md5Hash; }
+    public void setMd5Hash(String md5Hash) { this.md5Hash = md5Hash; }
+    
+    public FileStatus getStatus() { return status; }
+    public void setStatus(FileStatus status) { this.status = status; }
+    
+    public Boolean getIsPublic() { return isPublic; }
+    public void setIsPublic(Boolean isPublic) { this.isPublic = isPublic; }
+    
+    public Integer getDownloadCount() { return downloadCount; }
+    public void setDownloadCount(Integer downloadCount) { this.downloadCount = downloadCount; }
+    
+    public Integer getPreviewCount() { return previewCount; }
+    public void setPreviewCount(Integer previewCount) { this.previewCount = previewCount; }
+    
+    public Integer getShareCount() { return shareCount; }
+    public void setShareCount(Integer shareCount) { this.shareCount = shareCount; }
+    
+    public LocalDateTime getLastDownloadAt() { return lastDownloadAt; }
+    public void setLastDownloadAt(LocalDateTime lastDownloadAt) { this.lastDownloadAt = lastDownloadAt; }
+    
+    public LocalDateTime getLastPreviewAt() { return lastPreviewAt; }
+    public void setLastPreviewAt(LocalDateTime lastPreviewAt) { this.lastPreviewAt = lastPreviewAt; }
+    
+    public User getUploader() { return uploader; }
+    public void setUploader(User uploader) { this.uploader = uploader; }
+    
+    public Folder getFolder() { return folder; }
+    public void setFolder(Folder folder) { this.folder = folder; }
+    
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+    
+    public List<FileTag> getFileTags() { return fileTags; }
+    public void setFileTags(List<FileTag> fileTags) { this.fileTags = fileTags; }
 }

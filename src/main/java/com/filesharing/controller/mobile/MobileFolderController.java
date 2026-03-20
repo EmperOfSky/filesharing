@@ -91,6 +91,6 @@ public class MobileFolderController {
     
     // 辅助方法：从请求中获取当前用户
     private User getCurrentUser(HttpServletRequest request) {
-        return userService.findUserById(1L); // 示例用户ID
+        return userService.getCurrentUser(request);
     }
 }

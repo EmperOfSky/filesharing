@@ -27,8 +27,14 @@ public class Folder {
     /**
      * 文件夹名称
      */
-    @Column(nullable = false, length = 100)
+    @Column(name = "folder_name", length = 255)
     private String name;
+
+    /**
+     * 兼容历史数据库中的 name 列
+     */
+    @Column(name = "name", length = 255)
+    private String legacyName;
     
     /**
      * 文件夹描述
@@ -87,4 +93,16 @@ public class Folder {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PostLoad
+    @PrePersist
+    @PreUpdate
+    private void syncNameColumns() {
+        if ((name == null || name.isBlank()) && legacyName != null && !legacyName.isBlank()) {
+            name = legacyName;
+        }
+        if ((legacyName == null || legacyName.isBlank()) && name != null && !name.isBlank()) {
+            legacyName = name;
+        }
+    }
 }

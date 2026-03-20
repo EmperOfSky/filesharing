@@ -5,6 +5,8 @@ import com.filesharing.dto.UserRegisterRequest;
 import com.filesharing.dto.UserResponse;
 import com.filesharing.entity.User;
 
+import javax.servlet.http.HttpServletRequest;
+
 /**
  * 用户服务接口
  */
@@ -79,4 +81,9 @@ public interface UserService {
      * 根据ID查找用户实体
      */
     User findUserById(Long userId);
+    
+    /**
+     * 从HTTP请求中获取当前用户
+     */
+    User getCurrentUser(HttpServletRequest request);
 }

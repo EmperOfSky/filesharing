@@ -131,4 +131,50 @@ public class SmartRecommendation {
         COLLABORATION_PATTERN,  // 协作模式分析
         CONTENT_SIMILARITY      // 内容相似度分析
     }
+    
+    // 手动添加getter/setter方法
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    
+    public RecommendationType getRecommendationType() { return recommendationType; }
+    public void setRecommendationType(RecommendationType recommendationType) { this.recommendationType = recommendationType; }
+    
+    public Long getItemId() { return itemId; }
+    public void setItemId(Long itemId) { this.itemId = itemId; }
+    
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+    
+    public Double getRelevanceScore() { return relevanceScore; }
+    public void setRelevanceScore(Double relevanceScore) { this.relevanceScore = relevanceScore; }
+    
+    public SourceType getSourceType() { return sourceType; }
+    public void setSourceType(SourceType sourceType) { this.sourceType = sourceType; }
+    
+    public Long getSourceModelId() { return sourceModelId; }
+    public void setSourceModelId(Long sourceModelId) { this.sourceModelId = sourceModelId; }
+    
+    public Boolean getIsViewed() { return isViewed; }
+    public void setIsViewed(Boolean isViewed) { this.isViewed = isViewed; }
+    
+    public Boolean getIsAdopted() { return isAdopted; }
+    public void setIsAdopted(Boolean isAdopted) { this.isAdopted = isAdopted; }
+    
+    public LocalDateTime getViewedAt() { return viewedAt; }
+    public void setViewedAt(LocalDateTime viewedAt) { this.viewedAt = viewedAt; }
+    
+    public LocalDateTime getAdoptedAt() { return adoptedAt; }
+    public void setAdoptedAt(LocalDateTime adoptedAt) { this.adoptedAt = adoptedAt; }
+    
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
+    
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    
+    public LocalDateTime getExpireAt() { return expireAt; }
+    public void setExpireAt(LocalDateTime expireAt) { this.expireAt = expireAt; }
 }

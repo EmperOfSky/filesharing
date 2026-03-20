@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
@@ -39,7 +41,10 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
         CollaborationProject project = new CollaborationProject();
         project.setProjectName(projectCreateDTO.getProjectName());
         project.setDescription(projectCreateDTO.getDescription());
-        project.setTags(projectCreateDTO.getTags());
+        // 将List<String>转换为逗号分隔的字符串
+        if (projectCreateDTO.getTags() != null) {
+            project.setTags(String.join(",", projectCreateDTO.getTags()));
+        }
         project.setOwner(currentUser);
         project.setStatus(CollaborationProject.ProjectStatus.ACTIVE);
         project.setCreatedAt(LocalDateTime.now());
@@ -77,7 +82,7 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
         CollaborationProject project = getProjectById(projectId);
         
         // 检查权限
-        if (!hasProjectPermission(project, currentUser, ProjectMember.MemberRole.EDITOR)) {
+        if (!hasProjectPermission(project, currentUser, ProjectMember.MemberRole.MEMBER)) {
             throw new BusinessException("无权限编辑此项目");
         }
         
@@ -89,7 +94,7 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
             project.setDescription(projectUpdateDTO.getDescription());
         }
         if (projectUpdateDTO.getTags() != null) {
-            project.setTags(projectUpdateDTO.getTags());
+            project.setTags(String.join(",", projectUpdateDTO.getTags()));
         }
         
         project.setUpdatedAt(LocalDateTime.now());
@@ -108,7 +113,7 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
             throw new BusinessException("只有项目所有者可以删除项目");
         }
         
-        project.setStatus(CollaborationProject.ProjectStatus.DELETED);
+        project.setStatus(CollaborationProject.ProjectStatus.CLOSED);
         project.setUpdatedAt(LocalDateTime.now());
         projectRepository.save(project);
         
@@ -154,7 +159,7 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
         }
         
         // 查找被邀请用户
-        User invitedUser = userRepository.findByEmail(inviteDTO.getEmail())
+        User invitedUser = userRepository.findById(inviteDTO.getUserId())
                 .orElseThrow(() -> new BusinessException("用户不存在"));
         
         // 检查是否已是成员
@@ -166,7 +171,7 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
         ProjectMember member = new ProjectMember();
         member.setProject(project);
         member.setUser(invitedUser);
-        member.setRole(ProjectMember.MemberRole.valueOf(inviteDTO.getRole()));
+        member.setRole(inviteDTO.getRole());
         member.setStatus(ProjectMember.MemberStatus.ACTIVE);
         member.setInvitedBy(currentUser);
         member.setJoinedAt(LocalDateTime.now());
@@ -201,7 +206,7 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
     
     @Override
     public MemberResponseDTO updateMemberRole(Long projectId, Long memberId, 
-                                            MemberRoleUpdateRequest roleUpdate, User currentUser) {
+                                            ProjectMember.MemberRole newRole, String permissions, User currentUser) {
         CollaborationProject project = getProjectById(projectId);
         ProjectMember member = getProjectMemberById(memberId);
         
@@ -215,19 +220,18 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
             throw new BusinessException("不能修改项目所有者的角色");
         }
         
-        member.setRole(ProjectMember.MemberRole.valueOf(roleUpdate.getRole()));
-        member.setUpdatedAt(LocalDateTime.now());
+        member.setRole(newRole);
         ProjectMember updatedMember = memberRepository.save(member);
         
         log.info("更新成员角色: 项目ID={}, 用户={}, 新角色={}", 
-                projectId, member.getUser().getUsername(), roleUpdate.getRole());
+                projectId, member.getUser().getUsername(), newRole.name());
         
         return convertToMemberResponse(updatedMember);
     }
     
     @Override
     @Transactional(readOnly = true)
-    public List<MemberResponseDTO> getProjectMembers(Long projectId) {
+    public List<MemberResponseDTO> getProjectMembers(Long projectId, User currentUser) {
         CollaborationProject project = getProjectById(projectId);
         return memberRepository.findByProject(project)
                 .stream()
@@ -237,16 +241,27 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
     
     @Override
     @Transactional(readOnly = true)
-    public boolean hasProjectPermission(Long projectId, User user, String requiredRole) {
-        CollaborationProject project = getProjectById(projectId);
-        return hasProjectPermission(project, user, ProjectMember.MemberRole.valueOf(requiredRole));
+    public boolean hasProjectAccess(Long projectId, User user) {
+        try {
+            CollaborationProject project = getProjectById(projectId);
+            return hasProjectPermission(project, user, ProjectMember.MemberRole.VIEWER);
+        } catch (BusinessException e) {
+            return false;
+        }
     }
     
     @Override
     @Transactional(readOnly = true)
-    public long getProjectMemberCount(Long projectId) {
+    public ProjectStatsDTO getProjectStats(Long projectId) {
         CollaborationProject project = getProjectById(projectId);
-        return memberRepository.countByProject(project);
+        
+        ProjectStatsDTO stats = new ProjectStatsDTO();
+        stats.setProjectId(projectId);
+        stats.setTotalMembers(memberRepository.countByProject(project));
+        stats.setTotalDocuments(project.getFileCount() != null ? project.getFileCount().longValue() : 0L);
+        stats.setTotalComments(0L); // 需要根据实际评论表来计算
+        
+        return stats;
     }
     
     // ==================== 私有方法 ====================
@@ -261,6 +276,23 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
                 .orElseThrow(() -> new BusinessException("成员不存在"));
     }
     
+    private boolean hasRolePriority(ProjectMember.MemberRole userRole, ProjectMember.MemberRole requiredRole) {
+        // 定义角色优先级：OWNER > ADMIN > MEMBER > VIEWER
+        int userPriority = getRolePriority(userRole);
+        int requiredPriority = getRolePriority(requiredRole);
+        return userPriority >= requiredPriority;
+    }
+    
+    private int getRolePriority(ProjectMember.MemberRole role) {
+        switch (role) {
+            case OWNER: return 4;
+            case ADMIN: return 3;
+            case MEMBER: return 2;
+            case VIEWER: return 1;
+            default: return 0;
+        }
+    }
+    
     private boolean hasProjectPermission(CollaborationProject project, User user, 
                                        ProjectMember.MemberRole requiredRole) {
         // 项目所有者拥有最高权限
@@ -270,7 +302,7 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
         
         // 检查成员权限
         return memberRepository.findByProjectAndUser(project, user)
-                .map(member -> member.getRole().getPriority() >= requiredRole.getPriority())
+                .map(member -> hasRolePriority(member.getRole(), requiredRole))
                 .orElse(false);
     }
     
@@ -279,29 +311,29 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
         response.setId(project.getId());
         response.setProjectName(project.getProjectName());
         response.setDescription(project.getDescription());
-        response.setTags(project.getTags());
-        response.setStatus(project.getStatus().name());
+        // 处理标签：将逗号分隔的字符串转换为List
+        if (project.getTags() != null && !project.getTags().isEmpty()) {
+            response.setTags(Arrays.asList(project.getTags().split(",")));
+        } else {
+            response.setTags(new ArrayList<>());
+        }
+        response.setStatus(project.getStatus());
         
         // 设置所有者信息
-        UserSimpleResponse ownerResponse = new UserSimpleResponse();
+        ProjectResponseDTO.UserInfoDTO ownerResponse = new ProjectResponseDTO.UserInfoDTO();
         ownerResponse.setId(project.getOwner().getId());
         ownerResponse.setUsername(project.getOwner().getUsername());
         ownerResponse.setEmail(project.getOwner().getEmail());
-        ownerResponse.setNickname(project.getOwner().getNickname());
-        ownerResponse.setAvatar(project.getOwner().getAvatar());
         response.setOwner(ownerResponse);
         
         // 设置成员数量
         response.setMemberCount(memberRepository.countByProject(project));
         
-        response.setCreatedAt(project.getCreatedAt().toString());
-        response.setUpdatedAt(project.getUpdatedAt().toString());
+        response.setCreatedAt(project.getCreatedAt());
+        response.setUpdatedAt(project.getUpdatedAt());
         
-        // 设置当前用户权限信息
-        if (currentUser != null) {
-            response.setCurrentUserIsOwner(project.getOwner().getId().equals(currentUser.getId()));
-            response.setCurrentUserIsMember(memberRepository.existsByProjectAndUser(project, currentUser));
-        }
+        // 注意：ProjectResponseDTO中没有setCurrentUserIsOwner和setCurrentUserIsMember方法
+        // 这些信息可以通过其他方式传递给前端
         
         return response;
     }
@@ -309,18 +341,19 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
     private MemberResponseDTO convertToMemberResponse(ProjectMember member) {
         MemberResponseDTO response = new MemberResponseDTO();
         response.setId(member.getId());
-        response.setUserId(member.getUser().getId());
-        response.setUsername(member.getUser().getUsername());
-        response.setEmail(member.getUser().getEmail());
-        response.setNickname(member.getUser().getNickname());
-        response.setAvatar(member.getUser().getAvatar());
-        response.setRole(member.getRole().name());
-        response.setStatus(member.getStatus().name());
-        response.setJoinedAt(member.getJoinedAt().toString());
         
-        if (member.getInvitedBy() != null) {
-            response.setInvitedByUsername(member.getInvitedBy().getUsername());
-        }
+        // 设置用户信息
+        MemberResponseDTO.UserInfoDTO userInfo = new MemberResponseDTO.UserInfoDTO();
+        userInfo.setId(member.getUser().getId());
+        userInfo.setUsername(member.getUser().getUsername());
+        userInfo.setEmail(member.getUser().getEmail());
+        userInfo.setAvatar(member.getUser().getAvatar());
+        response.setUser(userInfo);
+        
+        response.setRole(member.getRole());
+        response.setPermissions(member.getPermissions());
+        response.setJoinedAt(member.getJoinedAt());
+        response.setLastActiveAt(member.getLastActivity());
         
         return response;
     }

@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Development
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.coverage
+htmlcov/
+
+# macOS
+.DS_Store
+._*
+
+# Frontend source (will be built from GitHub)
+fcb-fronted/
+themes/
+
+# Test files
+test_*.py
+tests/
+
+# Data (should be mounted as volume)
+data/
+
+# GitHub
+.github/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Claude
+.claude/

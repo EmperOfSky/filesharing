@@ -27,7 +27,10 @@ public class ShareResponse {
     private Integer currentAccessCount;
     private String status;
     private Boolean allowDownload;
+    private Boolean requiresPassword;
     private String accessUrl;
+    private String shortLink;
+    private String downloadUrl;
     private String createdAt;
     private String updatedAt;
 }

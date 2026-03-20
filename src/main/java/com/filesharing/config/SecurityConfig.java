@@ -1,5 +1,6 @@
 package com.filesharing.config;
 
+import com.filesharing.security.JwtAuthenticationFilter;
 import com.filesharing.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -8,6 +9,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,10 +25,12 @@ import java.util.Arrays;
  */
 @Configuration
 @EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
     
     private final JwtUtil jwtUtil;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
     
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -58,6 +62,13 @@ public class SecurityConfig {
                 // 公开接口
                 .antMatchers("/api/auth/**").permitAll()
                 .antMatchers("/api/files/public/**").permitAll()
+                .antMatchers("/api/shares/public/**").permitAll()
+                .antMatchers("/api/public/**").permitAll()
+                .antMatchers("/api/share/**").permitAll()
+                .antMatchers("/api/chunk/**").permitAll()
+                .antMatchers("/api/presign/**").permitAll()
+                .antMatchers("/api/admin/login", "/api/admin/login/").permitAll()
+                .antMatchers("/s/**").permitAll()
                 .antMatchers("/api/health").permitAll()
                 
                 // H2控制台（仅开发环境）
@@ -71,7 +82,10 @@ public class SecurityConfig {
             .and()
             
             // 配置headers以允许H2控制台iframe
-            .headers().frameOptions().disable();
+            .headers().frameOptions().disable()
+            .and()
+            // 在 filterChain 中添加 JWT 解析过滤器
+            .addFilterBefore(jwtAuthenticationFilter, org.springframework.web.filter.CorsFilter.class);
         
         return http.build();
     }

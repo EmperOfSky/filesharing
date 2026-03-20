@@ -35,21 +35,19 @@ public class MobileUploadController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) Long folderId,
             @RequestParam(required = false) String description) {
-        try {
-            User currentUser = getCurrentUser(request);
-            
-            MobileUploadRequest uploadRequest = new MobileUploadRequest();
-            uploadRequest.setFile(file);
-            uploadRequest.setFolderId(folderId);
-            uploadRequest.setDescription(description);
-            
-            FileUploadResponse response = fileService.uploadFile(uploadRequest, currentUser);
-            return ResponseEntity.ok(ApiResponse.success("上传成功", response));
-        } catch (Exception e) {
-            log.error("文件上传失败: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("上传失败: " + e.getMessage()));
+        User currentUser = getCurrentUser(request);
+        
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("文件不能为空");
         }
+        
+        MobileUploadRequest uploadRequest = new MobileUploadRequest();
+        uploadRequest.setFile(file);
+        uploadRequest.setFolderId(folderId);
+        uploadRequest.setDescription(description);
+        
+        FileUploadResponse response = fileService.uploadFile(uploadRequest, currentUser);
+        return ResponseEntity.ok(ApiResponse.success("上传成功", response));
     }
     
     @PostMapping("/chunk")
@@ -109,6 +107,6 @@ public class MobileUploadController {
     
     // 辅助方法：从请求中获取当前用户
     private User getCurrentUser(HttpServletRequest request) {
-        return userService.findUserById(1L); // 示例用户ID
+        return userService.getCurrentUser(request);
     }
 }

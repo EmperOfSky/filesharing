@@ -1,5 +1,11 @@
 package com.filesharing.service;
 
+import com.filesharing.ai.correction.CorrectionResult;
+import com.filesharing.ai.image.ImageAnalysisResult;
+import com.filesharing.ai.qa.QAResponse;
+import com.filesharing.ai.recommendation.RecommendationResult;
+import com.filesharing.ai.search.SmartSearchResult;
+import com.filesharing.ai.text.TextAnalysisResult;
 import com.filesharing.entity.AIModel;
 import com.filesharing.entity.User;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,19 +19,19 @@ import java.util.Map;
 public interface AIService {
     
     /**
-     * 文本内容智能分类
+     * 文本内容分析
      */
-    Map<String, Object> classifyTextContent(String content, User user);
+    TextAnalysisResult analyzeTextContent(String content, User user);
     
     /**
-     * 文件内容智能分析
+     * 图像内容分析
      */
-    Map<String, Object> analyzeFileContent(MultipartFile file, User user);
+    ImageAnalysisResult analyzeImage(MultipartFile image, User user);
     
     /**
-     * 图像内容识别
+     * 推荐相似文件
      */
-    Map<String, Object> recognizeImage(MultipartFile image, User user);
+    RecommendationResult recommendSimilarFiles(Long fileId, User user);
     
     /**
      * 智能标签推荐
@@ -33,9 +39,9 @@ public interface AIService {
     List<String> recommendTags(String content, String fileType, User user);
     
     /**
-     * 智能搜索优化
+     * 智能搜索
      */
-    List<Map<String, Object>> smartSearch(String query, User user);
+    SmartSearchResult smartSearch(String query, User user);
     
     /**
      * 用户行为分析
@@ -71,6 +77,21 @@ public interface AIService {
      * 测试AI模型连接
      */
     boolean testModelConnection(Long modelId);
+    
+    /**
+     * 文档智能摘要生成
+     */
+    String generateDocumentSummary(String documentContent, int summaryLength, String language);
+    
+    /**
+     * 智能问答系统
+     */
+    QAResponse answerQuestion(String question, String context, User user);
+    
+    /**
+     * 文本纠错服务
+     */
+    CorrectionResult correctText(String text, String language);
     
     /**
      * 记录AI分析日志

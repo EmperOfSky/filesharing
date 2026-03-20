@@ -282,6 +282,70 @@ public interface RecycleBinService {
     }
     
     /**
+     * 项目类型枚举
+     */
+    enum ItemType {
+        FILE, FOLDER
+    }
+    
+    /**
+     * 回收站项目信息DTO
+     */
+    class RecycleItemInfo {
+        private Long id;
+        private Long itemId;
+        private String itemType;
+        private String originalName;
+        private String originalPath;
+        private Long fileSize;
+        private String fileType;
+        private String deletedByName;
+        private LocalDateTime deletedAt;
+        private LocalDateTime expireAt;
+        private Boolean isRecoverable;
+        private String deleteReason;
+        
+        public RecycleItemInfo() {}
+        
+        // getters and setters
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        
+        public Long getItemId() { return itemId; }
+        public void setItemId(Long itemId) { this.itemId = itemId; }
+        
+        public String getItemType() { return itemType; }
+        public void setItemType(String itemType) { this.itemType = itemType; }
+        
+        public String getOriginalName() { return originalName; }
+        public void setOriginalName(String originalName) { this.originalName = originalName; }
+        
+        public String getOriginalPath() { return originalPath; }
+        public void setOriginalPath(String originalPath) { this.originalPath = originalPath; }
+        
+        public Long getFileSize() { return fileSize; }
+        public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
+        
+        public String getFileType() { return fileType; }
+        public void setFileType(String fileType) { this.fileType = fileType; }
+        
+        public String getDeletedByName() { return deletedByName; }
+        public void setDeletedByName(String deletedByName) { this.deletedByName = deletedByName; }
+        
+        public LocalDateTime getDeletedAt() { return deletedAt; }
+        public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+        
+        public LocalDateTime getExpireAt() { return expireAt; }
+        public void setExpireAt(LocalDateTime expireAt) { this.expireAt = expireAt; }
+        
+        public Boolean getIsRecoverable() { return isRecoverable; }
+        public void setIsRecoverable(Boolean isRecoverable) { this.isRecoverable = isRecoverable; }
+        
+        public String getDeleteReason() { return deleteReason; }
+        public void setDeleteReason(String deleteReason) { this.deleteReason = deleteReason; }
+    }
+    
+    /**
      * 批量操作结果DTO
      */
     class BatchOperationResult {

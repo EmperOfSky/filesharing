@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 import java.time.LocalDateTime;
 
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ShareCreateRequest {
     
-    @NotBlank(message = "分享内容ID不能为空")
+    @NotNull(message = "分享内容ID不能为空")
     private Long contentId;
     
     @NotBlank(message = "分享类型不能为空")

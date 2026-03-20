@@ -79,8 +79,19 @@ public interface FileRepository extends JpaRepository<FileEntity, Long> {
                           @Param("endTime") LocalDateTime endTime);
     
     /**
+     * 根据原始文件名模糊查找（忽略大小写）
+     */
+    @Query("SELECT f FROM FileEntity f WHERE LOWER(f.originalName) LIKE LOWER(CONCAT('%', :fileName, '%'))")
+    List<FileEntity> findByOriginalNameContainingIgnoreCase(@Param("fileName") String fileName);
+    
+    /**
      * 查找需要清理的已删除文件
      */
     @Query("SELECT f FROM FileEntity f WHERE f.status = 'DELETED' AND f.deletedAt < :beforeTime")
     List<FileEntity> findDeletedFilesBefore(@Param("beforeTime") LocalDateTime beforeTime);
+    
+    /**
+     * 查找指定时间之后创建的文件
+     */
+    Iterable<FileEntity> findByCreatedAtAfter(LocalDateTime sinceTime);
 }

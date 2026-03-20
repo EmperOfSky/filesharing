@@ -2,6 +2,7 @@ package com.filesharing.service;
 
 import com.filesharing.dto.ShareCreateRequest;
 import com.filesharing.dto.ShareResponse;
+import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.ShareRecord;
 import com.filesharing.entity.User;
 
@@ -21,6 +22,11 @@ public interface ShareService {
      * 获取分享信息
      */
     ShareResponse getShareByShareKey(String shareKey);
+
+    /**
+     * 获取公开分享信息（不增加访问次数）
+     */
+    ShareResponse getPublicShareInfo(String shareKey);
     
     /**
      * 获取用户的分享记录
@@ -31,6 +37,11 @@ public interface ShareService {
      * 访问分享（增加访问次数）
      */
     ShareResponse accessShare(String shareKey, String password, String ipAddress);
+
+    /**
+     * 校验并获取可下载的分享文件
+     */
+    FileEntity resolveShareFileForDownload(String shareKey, String password);
     
     /**
      * 删除分享

@@ -5,28 +5,33 @@ spring:
   application:
     name: file-sharing-system
   
-  # 数据库配置（使用H2内存数据库便于测试）
+  # 数据库配置 - MySQL
   datasource:
-    url: jdbc:h2:mem:filesharing
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: 
+    url: jdbc:mysql://localhost:3306/filesharing?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 123456 
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
   
   # JPA配置
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: true
-    database-platform: org.hibernate.dialect.H2Dialect
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQL8Dialect
     properties:
       hibernate:
         format_sql: true
-  
-  # H2控制台配置
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: true
     
   # 文件上传配置
   servlet:
@@ -54,9 +59,19 @@ file:
       - video/mp4
       - audio/mpeg
 
+# 额外上传相关配置（被新的后端校验使用）
+upload:
+  chunk:
+    max-size: 5242880   # 单分片最大 5MB
+  file:
+    max-size: 10737418240  # 单文件最大 10GB
+  allowed-types-csv: image/jpeg,image/png,image/gif,application/pdf,text/plain,video/mp4,audio/mpeg
+  cleanup:
+    expire-hours: 24
+
 # JWT配置
 jwt:
-  secret: filesharing_secret_key_2023_filesharing_secret_key_2023
+  secret: filesharing_super_secure_secret_key_2023_this_is_a_very_long_and_secure_secret_key_for_jwt_hs512_algorithm_usage_minimum_512_bits_required_for_security
   expiration: 86400000  # 24小时
   header: Authorization
   token-prefix: Bearer 
@@ -81,3 +96,16 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+# FileCodeBox 兼容配置
+fcb:
+  open-upload: true
+  upload-size: 10485760
+  upload-count: 10
+  upload-minute: 1
+  error-count: 10
+  error-minute: 1
+  max-save-seconds: 0
+  expire-styles: day,hour,minute,forever,count
+  presign-expire-seconds: 900
+  download-token-ttl-seconds: 600

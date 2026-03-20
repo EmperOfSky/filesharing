@@ -67,6 +67,12 @@ public class CloudStorageConfig {
     private String customDomain;
     
     /**
+     * 服务端点
+     */
+    @Column(name = "endpoint", length = 200)
+    private String endpoint;
+    
+    /**
      * 基础路径前缀
      */
     @Column(name = "base_path", length = 200)
@@ -157,4 +163,71 @@ public class CloudStorageConfig {
         MINIO,          // MinIO
         LOCAL           // 本地存储
     }
+    
+    // 手动添加getter/setter方法
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public String getConfigName() { return configName; }
+    public void setConfigName(String configName) { this.configName = configName; }
+    
+    public ProviderType getProviderType() { return providerType; }
+    public void setProviderType(ProviderType providerType) { this.providerType = providerType; }
+    
+    public String getAccessKeyId() { return accessKeyId; }
+    public void setAccessKeyId(String accessKeyId) { this.accessKeyId = accessKeyId; }
+    
+    public String getAccessKeySecret() { return accessKeySecret; }
+    public void setAccessKeySecret(String accessKeySecret) { this.accessKeySecret = accessKeySecret; }
+    
+    public String getBucketName() { return bucketName; }
+    public void setBucketName(String bucketName) { this.bucketName = bucketName; }
+    
+    public String getRegion() { return region; }
+    public void setRegion(String region) { this.region = region; }
+    
+    public String getCustomDomain() { return customDomain; }
+    public void setCustomDomain(String customDomain) { this.customDomain = customDomain; }
+    
+    public String getEndpoint() { return endpoint; }
+    public void setEndpoint(String endpoint) { this.endpoint = endpoint; }
+    
+    public String getBasePath() { return basePath; }
+    public void setBasePath(String basePath) { this.basePath = basePath; }
+    
+    public Boolean getIsEnabled() { return isEnabled; }
+    public void setIsEnabled(Boolean isEnabled) { this.isEnabled = isEnabled; }
+    
+    public Boolean getIsDefault() { return isDefault; }
+    public void setIsDefault(Boolean isDefault) { this.isDefault = isDefault; }
+    
+    public Long getStorageLimit() { return storageLimit; }
+    public void setStorageLimit(Long storageLimit) { this.storageLimit = storageLimit; }
+    
+    public Long getUsedStorage() { return usedStorage; }
+    public void setUsedStorage(Long usedStorage) { this.usedStorage = usedStorage; }
+    
+    public Long getFileSizeLimit() { return fileSizeLimit; }
+    public void setFileSizeLimit(Long fileSizeLimit) { this.fileSizeLimit = fileSizeLimit; }
+    
+    public String getAllowedFileTypes() { return allowedFileTypes; }
+    public void setAllowedFileTypes(String allowedFileTypes) { this.allowedFileTypes = allowedFileTypes; }
+    
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    
+    public String getConnectionStatus() { return connectionStatus; }
+    public void setConnectionStatus(String connectionStatus) { this.connectionStatus = connectionStatus; }
+    
+    public LocalDateTime getLastTestTime() { return lastTestTime; }
+    public void setLastTestTime(LocalDateTime lastTestTime) { this.lastTestTime = lastTestTime; }
+    
+    public String getTestResult() { return testResult; }
+    public void setTestResult(String testResult) { this.testResult = testResult; }
+    
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

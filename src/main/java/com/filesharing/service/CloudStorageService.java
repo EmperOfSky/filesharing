@@ -44,6 +44,11 @@ public interface CloudStorageService {
     List<StorageConfigInfo> getEnabledStorageConfigs();
     
     /**
+     * 获取默认存储配置
+     */
+    CloudStorageConfig getDefaultStorageConfig();
+    
+    /**
      * 设置默认存储配置
      */
     void setDefaultStorageConfig(Long configId);
@@ -114,7 +119,9 @@ public interface CloudStorageService {
      * 迁移文件到其他存储
      */
     MigrationResult migrateFiles(Long sourceConfigId, Long targetConfigId);
-    
+
+    CloudStorageConfig getStorageConfigById(Long configId);
+
     // ==================== DTO类定义 ====================
     
     /**
@@ -412,6 +419,11 @@ public interface CloudStorageService {
         
         public Long getFileCount() { return fileCount; }
         public void setFileCount(Long fileCount) { this.fileCount = fileCount; }
+        
+        // 兼容性setter方法
+        public void setTotalSpace(Long totalSpace) { this.totalLimit = totalSpace; }
+        public void setUsedSpace(Long usedSpace) { this.usedStorage = usedSpace; }
+        public void setAvailableSpace(Long availableSpace) { this.availableStorage = availableSpace; }
     }
     
     /**

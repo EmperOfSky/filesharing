@@ -2,9 +2,13 @@ package com.filesharing.controller;
 
 import com.filesharing.dto.ApiResponse;
 import com.filesharing.dto.PreviewResponse;
+import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
+import com.filesharing.repository.FileRepository;
+import com.filesharing.service.FileService;
 import com.filesharing.service.PreviewService;
 import com.filesharing.service.UserService;
+import com.filesharing.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -28,6 +32,7 @@ public class PreviewController {
     
     private final PreviewService previewService;
     private final UserService userService;
+    private final FileRepository fileRepository;
     
     /**
      * 预览文件
@@ -40,7 +45,7 @@ public class PreviewController {
             @RequestHeader(value = "X-Device-Type", required = false) String deviceType,
             HttpServletRequest request) {
         try {
-            User currentUser = getCurrentUser(request.getHeader("Authorization"));
+            User currentUser = getCurrentUser(request);
             String clientIp = getClientIpAddress(request);
             
             PreviewResponse response = previewService.previewFile(
@@ -65,14 +70,30 @@ public class PreviewController {
             @RequestParam(required = false) Integer height,
             HttpServletRequest request) {
         try {
-            Resource resource = previewService.getPreviewContent(fileId, type);
-            
-            // 获取文件信息以确定content-type
-            var fileEntity = previewService.getClass().getMethod("getFileEntityById", Long.class)
-                    .invoke(previewService, fileId);
-            
-            String contentType = "application/octet-stream";
-            // 这里需要通过反射或其他方式获取contentType
+            Resource resource;
+            FileEntity fileEntity = getFileEntity(fileId);
+
+            if ("text".equalsIgnoreCase(type)) {
+                String text = previewService.getTextPreview(fileEntity);
+                return ResponseEntity.ok()
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                        .body(new org.springframework.core.io.ByteArrayResource(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            } else if ("pdf".equalsIgnoreCase(type)) {
+                byte[] pdf = previewService.getPdfPreview(fileEntity);
+                return ResponseEntity.ok()
+                        .contentType(MediaType.APPLICATION_PDF)
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                        .body(new org.springframework.core.io.ByteArrayResource(pdf));
+            } else if ("image".equalsIgnoreCase(type)) {
+                resource = previewService.getImagePreview(fileEntity, width, height);
+            } else {
+                resource = previewService.getPreviewContent(fileId, type);
+            }
+
+            String contentType = fileEntity.getContentType() == null
+                    ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                    : fileEntity.getContentType();
             
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
@@ -90,9 +111,9 @@ public class PreviewController {
     @GetMapping("/{fileId}/text")
     public ResponseEntity<ApiResponse<String>> getTextPreview(@PathVariable Long fileId) {
         try {
-            // 这里需要注入FileService来获取文件实体
-            // String content = previewService.getTextPreview(fileEntity);
-            return ResponseEntity.ok(ApiResponse.success("文本内容"));
+            FileEntity fileEntity = getFileEntity(fileId);
+            String content = previewService.getTextPreview(fileEntity);
+            return ResponseEntity.ok(ApiResponse.success(content));
         } catch (Exception e) {
             log.error("获取文本预览失败: {}", e.getMessage());
             return ResponseEntity.badRequest()
@@ -106,11 +127,12 @@ public class PreviewController {
     @GetMapping("/{fileId}/pdf")
     public ResponseEntity<byte[]> getPdfPreview(@PathVariable Long fileId) {
         try {
-            // byte[] pdfContent = previewService.getPdfPreview(fileEntity);
+            FileEntity fileEntity = getFileEntity(fileId);
+            byte[] pdfContent = previewService.getPdfPreview(fileEntity);
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                    .body(new byte[0]);
+                    .body(pdfContent);
         } catch (Exception e) {
             log.error("获取PDF预览失败: {}", e.getMessage());
             return ResponseEntity.notFound().build();
@@ -126,11 +148,12 @@ public class PreviewController {
             @RequestParam(required = false) Integer width,
             @RequestParam(required = false) Integer height) {
         try {
-            // Resource imageResource = previewService.getImagePreview(fileEntity, width, height);
+            FileEntity fileEntity = getFileEntity(fileId);
+            Resource imageResource = previewService.getImagePreview(fileEntity, width, height);
             return ResponseEntity.ok()
                     .contentType(MediaType.IMAGE_JPEG)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                    .body(null);
+                    .body(imageResource);
         } catch (Exception e) {
             log.error("获取图片预览失败: {}", e.getMessage());
             return ResponseEntity.notFound().build();
@@ -159,9 +182,9 @@ public class PreviewController {
      */
     @GetMapping("/user/statistics")
     public ResponseEntity<ApiResponse<PreviewService.UserPreviewStatistics>> getUserPreviewStatistics(
-            @RequestHeader("Authorization") String authorization) {
+            HttpServletRequest request) {
         try {
-            User currentUser = getCurrentUser(authorization);
+            User currentUser = getCurrentUser(request);
             PreviewService.UserPreviewStatistics statistics = 
                     previewService.getUserPreviewStatistics(currentUser.getId());
             return ResponseEntity.ok(ApiResponse.success(statistics));
@@ -208,8 +231,12 @@ public class PreviewController {
     /**
      * 获取当前用户（简化实现）
      */
-    private User getCurrentUser(String authorization) {
-        // 实际项目中应该解析JWT token获取用户信息
-        return userService.findUserById(1L); // 示例用户ID
+    private User getCurrentUser(HttpServletRequest request) {
+        return userService.getCurrentUser(request);
+    }
+
+    private FileEntity getFileEntity(Long fileId) {
+        return fileRepository.findById(fileId)
+                .orElseThrow(() -> new BusinessException("文件不存在"));
     }
 }
