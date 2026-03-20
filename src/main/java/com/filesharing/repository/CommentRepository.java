@@ -3,7 +3,6 @@ package com.filesharing.repository;
 import com.filesharing.entity.Comment;
 import com.filesharing.entity.User;
 import com.filesharing.entity.FileEntity;
-import com.filesharing.entity.CollaborativeDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

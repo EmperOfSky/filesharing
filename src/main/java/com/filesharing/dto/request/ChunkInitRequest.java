@@ -1,7 +1,6 @@
 package com.filesharing.dto.request;
 
 import lombok.Data;
-import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 分片上传初始化请求

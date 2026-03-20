@@ -541,6 +541,7 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         return message;
     }
     
+    @SuppressWarnings("unused")
     private CollaborationMessage createEditOperationMessage(String userId, String userName, String operation, Integer position) {
         CollaborationMessage message = new CollaborationMessage();
         message.setType(MessageType.EDIT_OPERATION);

@@ -4,7 +4,6 @@ import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
 import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.FileRepository;
-import com.filesharing.repository.FileVersionRepository;
 import com.filesharing.service.VersionControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +24,6 @@ import java.util.List;
 @Transactional
 public class VersionControlServiceImpl implements VersionControlService {
     
-    private final FileVersionRepository fileVersionRepository;
     private final FileRepository fileRepository;
     
     @Override

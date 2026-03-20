@@ -12,7 +12,6 @@ import java.lang.management.ThreadMXBean;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 系统监控服务 - 提供全面的性能监控和健康检查功能
@@ -32,7 +31,6 @@ public class SystemMonitoringService {
     
     // 性能阈值配置
     private static final double MEMORY_THRESHOLD = 0.85; // 85%内存使用率
-    private static final double CPU_THRESHOLD = 0.80;    // 80%CPU使用率
     private static final long DISK_SPACE_THRESHOLD = 1024 * 1024 * 1024; // 1GB剩余空间
     
     /**

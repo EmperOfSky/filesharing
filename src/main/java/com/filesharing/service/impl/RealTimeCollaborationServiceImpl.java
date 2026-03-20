@@ -716,6 +716,7 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
             this.content = content;
         }
 
+        @SuppressWarnings("unused")
         public Long getBaseVersion() {
             return baseVersion;
         }

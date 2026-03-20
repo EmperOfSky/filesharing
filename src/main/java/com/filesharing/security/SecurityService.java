@@ -33,7 +33,6 @@ public class SecurityService {
     private final Set<Long> privilegedUsers = ConcurrentHashMap.newKeySet();
     
     // 安全配置参数
-    private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final int SESSION_TIMEOUT_MINUTES = 30;
     private static final int MAX_CONCURRENT_SESSIONS = 3;
     private static final int RATE_LIMIT_WINDOW_SECONDS = 60;

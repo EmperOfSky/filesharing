@@ -6,8 +6,6 @@ import com.filesharing.repository.CloudStorageConfigRepository;
 import com.filesharing.service.CloudStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -501,6 +499,7 @@ public class CloudStorageServiceImpl implements CloudStorageService {
         }
     }
     
+    @SuppressWarnings("unused")
     private String uploadToProvider(MultipartFile file, String remotePath, CloudStorageConfig config) throws Exception {
         // 根据提供商类型实现具体的上传逻辑
         String providerType = config.getProviderType().toString();
@@ -521,6 +520,7 @@ public class CloudStorageServiceImpl implements CloudStorageService {
         }
     }
     
+    @SuppressWarnings("unused")
     private byte[] downloadFromProvider(String cloudKey, CloudStorageConfig config) throws Exception {
         // 根据提供商类型实现具体的下载逻辑
         String providerType = config.getProviderType().toString();

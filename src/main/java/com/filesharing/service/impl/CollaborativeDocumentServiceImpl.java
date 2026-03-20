@@ -265,7 +265,7 @@ public class CollaborativeDocumentServiceImpl implements CollaborativeDocumentSe
     @Override
     @Transactional(readOnly = true)
     public DocumentStatsDTO getDocumentStats(Long documentId) {
-        CollaborativeDocument document = getDocumentById(documentId);
+        getDocumentById(documentId);
         
         DocumentStatsDTO stats = new DocumentStatsDTO();
         stats.setDocumentId(documentId);

@@ -1,7 +1,6 @@
 package com.filesharing.service;
 
 import com.filesharing.entity.User;
-import com.filesharing.websocket.DocumentLockManager;
 
 import java.util.List;
 import java.util.Map;

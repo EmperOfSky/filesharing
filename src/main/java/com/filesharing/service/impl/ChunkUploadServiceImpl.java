@@ -4,7 +4,6 @@ import com.filesharing.dto.request.ChunkInitRequest;
 import com.filesharing.dto.request.ChunkUploadRequest;
 import com.filesharing.dto.response.ChunkInitResponse;
 import com.filesharing.dto.response.ChunkUploadResponse;
-import com.filesharing.dto.response.FileSimpleResponse;
 import com.filesharing.entity.ChunkUploadRecord;
 import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
@@ -17,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,7 +51,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             record.setStatus(ChunkUploadRecord.UploadStatus.INITIALIZED);
             record.setExpireTime(LocalDateTime.now().plusHours(24)); // 24小时过期
             
-            ChunkUploadRecord savedRecord = chunkUploadRecordRepository.save(record);
+            chunkUploadRecordRepository.save(record);
             
             log.info("分片上传初始化成功: uploadId={}, 文件名={}, 总分片数={}", 
                     uploadId, request.getFileName(), request.getTotalChunks());
@@ -90,7 +88,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             }
             
             // 保存分片
-            String chunkFileName = fileStorageUtil.saveChunk(
+                fileStorageUtil.saveChunk(
                     request.getChunk(), request.getUploadId(), request.getChunkIndex());
             
             // 更新上传记录
@@ -240,7 +238,6 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
     private void cleanupChunks(String uploadId, Integer totalChunks) {
         try {
             for (int i = 0; i < totalChunks; i++) {
-                String chunkFileName = uploadId + "_part_" + i;
                 // 这里应该调用文件存储工具删除分片文件
                 // fileStorageUtil.deleteChunk(chunkFileName);
             }

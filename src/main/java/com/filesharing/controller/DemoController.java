@@ -3,7 +3,6 @@ package com.filesharing.controller;
 import com.filesharing.dto.ApiResponse;
 import com.filesharing.dto.UserRegisterRequest;
 import com.filesharing.dto.UserResponse;
-import com.filesharing.entity.User;
 import com.filesharing.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

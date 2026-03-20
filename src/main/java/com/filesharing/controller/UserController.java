@@ -3,7 +3,6 @@ package com.filesharing.controller;
 import com.filesharing.dto.ApiResponse;
 import com.filesharing.dto.UserResponse;
 import com.filesharing.entity.User;
-import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.UserRepository;
 import com.filesharing.service.UserService;
 import lombok.RequiredArgsConstructor;

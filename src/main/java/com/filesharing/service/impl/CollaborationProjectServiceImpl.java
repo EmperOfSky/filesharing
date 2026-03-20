@@ -123,7 +123,6 @@ public class CollaborationProjectServiceImpl implements CollaborationProjectServ
     @Override
     @Transactional(readOnly = true)
     public Page<ProjectResponseDTO> getUserProjects(User user, Pageable pageable) {
-        List<CollaborationProject> projects = projectRepository.findProjectsByUser(user);
         return projectRepository.findAll(pageable)
                 .map(project -> convertToProjectResponse(project, user));
     }

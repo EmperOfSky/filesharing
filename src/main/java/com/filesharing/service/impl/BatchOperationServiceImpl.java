@@ -10,9 +10,7 @@ import com.filesharing.service.BatchOperationService;
 import com.filesharing.service.FileService;
 import com.filesharing.service.FolderService;
 import com.filesharing.service.UserService;
-import com.filesharing.util.FileStorageUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
@@ -40,7 +38,6 @@ public class BatchOperationServiceImpl implements BatchOperationService {
     private final FileService fileService;
     private final FolderService folderService;
     private final UserService userService;
-    private final FileStorageUtil fileStorageUtil;
     
     public BatchOperation createBatchOperation(BatchOperation operation) {
         operation.setStartedAt(LocalDateTime.now());
@@ -258,10 +255,6 @@ public class BatchOperationServiceImpl implements BatchOperationService {
             Long totalOperations = (Long) (stats[0] != null ? stats[0] : 0L);
             Long completedOperations = (Long) (stats[1] != null ? stats[1] : 0L);
             Long failedOperations = (Long) (stats[2] != null ? stats[2] : 0L);
-            
-            // 计算成功率
-            Double successRate = totalOperations > 0 ? 
-                (double) completedOperations / totalOperations * 100 : 0.0;
             
             // 计算平均处理时间（简化实现）
             Double averageProcessingTime = 5.0; // 默认5秒

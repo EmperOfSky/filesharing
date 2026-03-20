@@ -12,7 +12,6 @@ import org.springframework.util.StringUtils;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.servlet.Filter;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
@@ -35,7 +34,6 @@ public class JwtAuthenticationFilter implements Filter {
                 String token = header.substring(7);
                 if (jwtUtil.validateToken(token)) {
                     String username = jwtUtil.getUsernameFromToken(token);
-                    Long userId = jwtUtil.getUserIdFromToken(token);
                     // 这里简单地把 username 作为 principal，并设置一个空角色
                     UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(username, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
                     SecurityContextHolder.getContext().setAuthentication(auth);

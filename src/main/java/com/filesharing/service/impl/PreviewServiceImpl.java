@@ -11,7 +11,6 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,8 +53,8 @@ public class PreviewServiceImpl implements PreviewService {
     
     @Override
     public Resource getPreviewContent(Long fileId, String previewType) {
-        FileEntity file = fileRepository.findById(fileId)
-                .orElseThrow(() -> new RuntimeException("文件不存在"));
+        fileRepository.findById(fileId)
+            .orElseThrow(() -> new RuntimeException("文件不存在"));
         
         // 返回模拟的内容资源
         byte[] content = "这是文件预览内容".getBytes();

@@ -1,7 +1,6 @@
 package com.filesharing.service;
 
 import com.filesharing.dto.*;
-import com.filesharing.entity.CollaborationProject;
 import com.filesharing.entity.ProjectMember;
 import com.filesharing.entity.User;
 import org.springframework.data.domain.Page;

@@ -10,7 +10,6 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +26,6 @@ public class ThumbnailGenerator {
     @Value("${file.thumbnail.path:./thumbnails/}")
     private String thumbnailPath;
     
-    private static final Color BACKGROUND_COLOR = Color.WHITE;
     private static final Color WATERMARK_COLOR = new Color(0, 0, 0, 100); // 半透明黑色
     
     /**
@@ -126,7 +124,6 @@ public class ThumbnailGenerator {
         
         FontMetrics fontMetrics = g2d.getFontMetrics();
         int textWidth = fontMetrics.stringWidth(watermarkText);
-        int textHeight = fontMetrics.getHeight();
         
         int x = image.getWidth() - textWidth - 10;
         int y = image.getHeight() - 10;

@@ -20,7 +20,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -33,7 +32,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -1210,6 +1208,7 @@ public class FileCodeBoxService {
         private LocalDateTime expireAt;
         private Integer expiredCount;
         private final Long creatorUserId;
+        @SuppressWarnings("unused")
         private final LocalDateTime createdAt;
         private final LocalDateTime expiresAt;
         private final Set<Integer> uploadedChunks = Collections.newSetFromMap(new ConcurrentHashMap<>());

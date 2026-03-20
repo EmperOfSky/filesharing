@@ -32,7 +32,6 @@ public class AntiAbuseService {
     // 配置参数
     private static final int DEFAULT_RATE_LIMIT = 100; // 每分钟请求数
     private static final int STRICT_RATE_LIMIT = 20;   // 严格限制
-    private static final int BLACKLIST_DURATION_MINUTES = 60; // 黑名单持续时间
     
     /**
      * 检查请求频率限制

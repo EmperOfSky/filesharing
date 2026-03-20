@@ -6,7 +6,6 @@ import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.SearchRecord;
 import com.filesharing.entity.User;
 import com.filesharing.repository.FileRepository;
-import com.filesharing.repository.FolderRepository;
 import com.filesharing.repository.SearchRecordRepository;
 import com.filesharing.service.SearchService;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +39,6 @@ import java.util.stream.Collectors;
 public class SearchServiceImpl implements SearchService {
     
     private final FileRepository fileRepository;
-    private final FolderRepository folderRepository;
     private final SearchRecordRepository searchRecordRepository;
     
     @Override
