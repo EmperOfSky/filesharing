@@ -14,7 +14,6 @@ import com.filesharing.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,16 +21,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.filesharing.util.FileStorageUtil;
 
 /**
  * 文件控制器
@@ -46,6 +42,7 @@ public class FileController {
     private final FileService fileService;
     private final FolderService folderService;
     private final UserService userService;
+    private final FileStorageUtil fileStorageUtil;
     
     /**
      * 上传文件
@@ -642,32 +639,6 @@ public class FileController {
     }
 
     private Resource resolveFileResource(FileEntity fileEntity) {
-        try {
-            Path uploadPath = Paths.get("./uploads").toAbsolutePath().normalize();
-            Path byStorageName = uploadPath.resolve(fileEntity.getStorageName()).normalize();
-            if (Files.exists(byStorageName)) {
-                return new UrlResource(byStorageName.toUri());
-            }
-
-            String filePath = fileEntity.getFilePath();
-            if (filePath != null && !filePath.isBlank()) {
-                String normalized = filePath.replace("\\", "/");
-                if (normalized.startsWith("/")) {
-                    normalized = normalized.substring(1);
-                }
-                if (normalized.startsWith("uploads/")) {
-                    normalized = normalized.substring("uploads/".length());
-                }
-
-                Path byFilePath = uploadPath.resolve(normalized).normalize();
-                if (Files.exists(byFilePath)) {
-                    return new UrlResource(byFilePath.toUri());
-                }
-            }
-            return null;
-        } catch (MalformedURLException e) {
-            log.error("解析文件资源失败: {}", e.getMessage());
-            return null;
-        }
+        return fileStorageUtil.loadAsResource(fileEntity.getStorageName(), fileEntity.getFilePath());
     }
 }

@@ -192,34 +192,6 @@ CREATE TABLE IF NOT EXISTS notifications (
   KEY idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表';
 
--- 创建AI分析记录表
-CREATE TABLE IF NOT EXISTS ai_analysis_records (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
-  file_id BIGINT COMMENT '文件ID',
-  user_id BIGINT NOT NULL COMMENT '用户ID',
-  analysis_type VARCHAR(50) COMMENT '分析类型',
-  analysis_result LONGTEXT COMMENT '分析结果',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE SET NULL,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  KEY idx_file_id (file_id),
-  KEY idx_user_id (user_id),
-  KEY idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI分析记录表';
-
--- 创建AI模型表
-CREATE TABLE IF NOT EXISTS ai_models (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '模型ID',
-  model_name VARCHAR(100) NOT NULL UNIQUE COMMENT '模型名称',
-  model_type VARCHAR(50) COMMENT '模型类型',
-  description TEXT COMMENT '模型描述',
-  api_key VARCHAR(255) COMMENT 'API密钥',
-  is_enabled BOOLEAN DEFAULT TRUE COMMENT '是否启用',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  KEY idx_model_name (model_name),
-  KEY idx_is_enabled (is_enabled)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型表';
-
 -- 创建批量操作表
 CREATE TABLE IF NOT EXISTS batch_operations (
   id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '批量操作ID',
@@ -240,18 +212,6 @@ CREATE TABLE IF NOT EXISTS batch_operations (
 CREATE INDEX idx_files_uploader_created ON files(uploader_id, created_at);
 CREATE INDEX idx_files_folder_created ON files(folder_id, created_at);
 CREATE INDEX idx_users_created_at ON users(created_at);
-
--- 插入默认AI模型
-INSERT INTO ai_models (model_name, model_type, description, is_enabled) VALUES
-('文档总结', 'SUMMARIZATION', '文档内容总结和压缩', TRUE),
-('问答系统', 'QA', '基于上下文的问答回答', TRUE),
-('文本纠正', 'TEXT_CORRECTION', '文本语法和拼写检查纠正', TRUE),
-('内容分类', 'CLASSIFICATION', '文本内容自动分类', TRUE),
-('文件分析', 'FILE_ANALYSIS', '文件内容深度分析', TRUE),
-('标签推荐', 'TAG_RECOMMENDATION', '为文件推荐相关标签', TRUE),
-('智能搜索', 'SMART_SEARCH', '基于语义的智能文件搜索', TRUE),
-('情感分析', 'SENTIMENT_ANALYSIS', '分析文本情感倾向', TRUE),
-('关键词提取', 'KEYWORD_EXTRACTION', '自动提取文本关键词', TRUE);
 
 -- 设置自增ID起始值
 ALTER TABLE users AUTO_INCREMENT = 1;

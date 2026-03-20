@@ -5,13 +5,13 @@ import com.filesharing.dto.ShareCreateRequest;
 import com.filesharing.dto.ShareResponse;
 import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
+import com.filesharing.service.GeoIpService;
 import com.filesharing.service.ShareService;
 import com.filesharing.service.UserService;
 import com.filesharing.util.FileStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +19,8 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +42,7 @@ public class ShareController {
 
     private final ShareService shareService;
     private final UserService userService;
+    private final GeoIpService geoIpService;
     private final FileStorageUtil fileStorageUtil;
 
     private final Map<String, AccessGrant> accessTokenStore = new ConcurrentHashMap<>();
@@ -75,9 +72,29 @@ public class ShareController {
     public ResponseEntity<ApiResponse<ShareResponse>> getPublicShareInfo(
             @PathVariable String shareKey,
             HttpServletRequest request) {
-        ShareResponse response = shareService.getPublicShareInfo(shareKey);
+        String ipAddress = resolveClientIp(request);
+        String visitorAddress = resolveVisitorAddress(request, ipAddress);
+        String userAgent = request.getHeader("User-Agent");
+
+        ShareResponse response = shareService.getPublicShareInfoWithTracking(
+            shareKey,
+            ipAddress,
+            visitorAddress,
+            userAgent,
+            request.getHeader("Referer")
+        );
         response.setShortLink(toAbsoluteLink(request, response.getShortLink()));
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{shareId}/monitoring")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getShareMonitoring(
+            @PathVariable Long shareId,
+            @RequestParam(defaultValue = "20") int limit,
+            HttpServletRequest request) {
+        User currentUser = userService.getCurrentUser(request);
+        Map<String, Object> details = shareService.getShareMonitoringDetails(shareId, currentUser, limit);
+        return ResponseEntity.ok(ApiResponse.success("获取分享监控详情成功", details));
     }
 
     @PostMapping("/public/{shareKey}/access")
@@ -88,7 +105,7 @@ public class ShareController {
         cleanupExpiredTokens();
 
         String password = body == null ? null : body.get("password");
-        ShareResponse share = shareService.accessShare(shareKey, password, request.getRemoteAddr());
+        ShareResponse share = shareService.accessShare(shareKey, password, resolveClientIp(request));
         share.setShortLink(toAbsoluteLink(request, share.getShortLink()));
 
         String accessToken = UUID.randomUUID().toString().replace("-", "");
@@ -167,28 +184,7 @@ public class ShareController {
     }
 
     private Resource resolveSharedFileResource(FileEntity fileEntity) {
-        try {
-            String storageName = fileEntity.getStorageName();
-            Path uploadPath = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-            Path filePath = uploadPath.resolve(storageName).normalize();
-
-            if (!Files.exists(filePath)) {
-                String fallbackPath = fileEntity.getFilePath();
-                if (fallbackPath != null && !fallbackPath.isBlank()) {
-                    String fileName = fallbackPath.substring(fallbackPath.lastIndexOf('/') + 1);
-                    filePath = uploadPath.resolve(fileName).normalize();
-                }
-            }
-
-            if (!Files.exists(filePath)) {
-                return null;
-            }
-
-            return new UrlResource(filePath.toUri());
-        } catch (MalformedURLException e) {
-            log.error("解析分享文件失败: {}", e.getMessage(), e);
-            return null;
-        }
+        return fileStorageUtil.loadAsResource(fileEntity.getStorageName(), fileEntity.getFilePath());
     }
 
     private String toAbsoluteLink(HttpServletRequest request, String shortLink) {
@@ -240,6 +236,60 @@ public class ShareController {
     private void cleanupExpiredTokens() {
         LocalDateTime now = LocalDateTime.now();
         accessTokenStore.entrySet().removeIf(entry -> entry.getValue().expiresAt.isBefore(now));
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+
+        return request.getRemoteAddr();
+    }
+
+    private String resolveVisitorAddress(HttpServletRequest request, String ipAddress) {
+        String headerAddress = joinGeoHeaders(
+                request.getHeader("X-Geo-City"),
+                request.getHeader("X-Geo-Region"),
+                request.getHeader("X-Geo-Country")
+        );
+        if (!headerAddress.isBlank()) {
+            return headerAddress;
+        }
+
+        String cfCountry = request.getHeader("CF-IPCountry");
+        if (cfCountry != null && !cfCountry.isBlank()) {
+            return cfCountry.trim();
+        }
+
+        if (ipAddress == null || ipAddress.isBlank()) {
+            return "unknown";
+        }
+
+        return geoIpService.resolveLocation(ipAddress);
+    }
+
+    private String joinGeoHeaders(String city, String region, String country) {
+        StringBuilder sb = new StringBuilder();
+        appendAddressPart(sb, country);
+        appendAddressPart(sb, region);
+        appendAddressPart(sb, city);
+        return sb.toString();
+    }
+
+    private void appendAddressPart(StringBuilder sb, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append('/');
+        }
+        sb.append(value.trim());
     }
 
     private static class AccessGrant {

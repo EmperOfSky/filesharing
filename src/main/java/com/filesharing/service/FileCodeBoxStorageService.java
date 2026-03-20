@@ -2,7 +2,6 @@ package com.filesharing.service;
 
 import com.filesharing.entity.CloudStorageConfig;
 import com.filesharing.entity.PickupCodeRecord;
-import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.CloudStorageConfigRepository;
 import com.filesharing.util.FileStorageUtil;
 import lombok.AllArgsConstructor;
@@ -10,15 +9,10 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
@@ -53,37 +47,16 @@ public class FileCodeBoxStorageService {
     }
 
     public void saveLocalFile(MultipartFile file, String relativePath) throws IOException {
-        Path uploadRoot = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-        Path target = uploadRoot.resolve(relativePath).normalize();
-        if (!target.startsWith(uploadRoot)) {
-            throw new BusinessException("INVALID_PATH", "非法的文件保存路径");
-        }
-
-        Files.createDirectories(target.getParent());
-        file.transferTo(target);
+        fileStorageUtil.saveFileAtPath(file, relativePath);
     }
 
     public Resource loadLocalResource(String relativePath) {
-        try {
-            Path uploadRoot = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-            Path target = uploadRoot.resolve(relativePath).normalize();
-            if (!target.startsWith(uploadRoot) || !Files.exists(target)) {
-                return null;
-            }
-            return new UrlResource(target.toUri());
-        } catch (MalformedURLException e) {
-            log.error("加载本地文件资源失败: {}", e.getMessage(), e);
-            return null;
-        }
+        return fileStorageUtil.loadAsResource(relativePath, null);
     }
 
     public void deleteLocalQuietly(String relativePath) {
         try {
-            Path uploadRoot = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-            Path target = uploadRoot.resolve(relativePath).normalize();
-            if (target.startsWith(uploadRoot) && Files.exists(target)) {
-                Files.delete(target);
-            }
+            fileStorageUtil.deleteFile(relativePath);
         } catch (Exception e) {
             log.warn("删除本地文件失败: path={}, error={}", relativePath, e.getMessage());
         }

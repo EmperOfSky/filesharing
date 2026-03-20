@@ -1,0 +1,1958 @@
+﻿{
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080"
+                     },
+                     {
+                         "key":  "token",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "configId",
+                         "value":  "1"
+                     },
+                     {
+                         "key":  "fileId",
+                         "value":  "1"
+                     },
+                     {
+                         "key":  "folderId",
+                         "value":  "1"
+                     },
+                     {
+                         "key":  "itemId",
+                         "value":  "1"
+                     },
+                     {
+                         "key":  "uploadId",
+                         "value":  "demo-upload-id"
+                     },
+                     {
+                         "key":  "taskId",
+                         "value":  "demo-task-id"
+                     },
+                     {
+                         "key":  "alertId",
+                         "value":  "1"
+                     },
+                     {
+                         "key":  "id",
+                         "value":  "1"
+                     },
+                     {
+                         "key":  "backupPath",
+                         "value":  "demo-backup.zip"
+                     }
+                 ],
+    "info":  {
+                 "description":  "Auto-generated collection for the File Sharing System backend APIs.",
+                 "name":  "File Sharing System API",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+                 "_postman_id":  "068dbdaa-e808-478b-b338-e162ff7c6f42"
+             },
+    "item":  [
+                 {
+                     "name":  "AuthController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n    \"identifier\":  \"demo_user\",\r\n    \"password\":  \"Passw0rd!\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/auth/debug-login",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ]
+                                                  },
+                                      "name":  "POST /api/auth/debug-login",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n    \"identifier\":  \"demo_user\",\r\n    \"password\":  \"Passw0rd!\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/auth/login",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ]
+                                                  },
+                                      "name":  "POST /api/auth/login",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/auth/me",
+                                                      "header":  [
+
+                                                                 ]
+                                                  },
+                                      "name":  "GET /api/auth/me",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n    \"username\":  \"demo_user\",\r\n    \"email\":  \"demo@example.com\",\r\n    \"password\":  \"Passw0rd!\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/auth/register",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ]
+                                                  },
+                                      "name":  "POST /api/auth/register",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "BackupController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/backup/{{backupPath}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "DELETE /api/backup/{backupPath}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/backup/async",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/backup/async",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/backup/cleanup",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "DELETE /api/backup/cleanup",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/backup/config/export",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/backup/config/export",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/backup/config/import",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/backup/config/import",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/backup/full",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/backup/full",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/backup/incremental",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/backup/incremental",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/backup/list",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/backup/list",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/backup/restore",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/backup/restore",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/backup/statistics",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/backup/statistics",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/backup/task/{{taskId}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/backup/task/{taskId}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/backup/validate",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/backup/validate",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "ChunkUploadController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/upload/chunk",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/upload/chunk",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/upload/chunk/complete",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/upload/chunk/complete",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/upload/chunk/init",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/upload/chunk/init",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "CloudStorageController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n    \"providerType\":  \"ONE_DRIVE\",\r\n    \"endpoint\":  \"https://graph.microsoft.com/v1.0\",\r\n    \"configId\":  1,\r\n    \"sampleBytes\":  256,\r\n    \"probeUrl\":  \"https://httpbin.org/get\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/async-probe",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/cloud-storage/async-probe",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/capabilities",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/cloud-storage/capabilities",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/cloud-storage/configs",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n    \"accessKeyId\":  \"AKIA...\",\r\n    \"region\":  \"us-east-1\",\r\n    \"providerType\":  \"AWS_S3\",\r\n    \"configName\":  \"s3-demo\",\r\n    \"accessKeySecret\":  \"SECRET...\",\r\n    \"bucketName\":  \"demo-bucket\",\r\n    \"isDefault\":  false,\r\n    \"endpoint\":  \"https://s3.amazonaws.com\",\r\n    \"isEnabled\":  true\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/cloud-storage/configs",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/{{configId}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "DELETE /api/cloud-storage/configs/{configId}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/{{configId}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/cloud-storage/configs/{configId}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/{{configId}}",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "PUT /api/cloud-storage/configs/{configId}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/{{configId}}/test-connection",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/cloud-storage/configs/{configId}/test-connection",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/{{configId}}/usage",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/cloud-storage/configs/{configId}/usage",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/default",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/cloud-storage/configs/default",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/enabled",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/cloud-storage/configs/enabled",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/configs/info",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/cloud-storage/configs/info",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n    \"oneDriveDomain\":  \"common\",\r\n    \"oneDriveClientId\":  \"client-id\",\r\n    \"accessKeyId\":  \"client-id\",\r\n    \"region\":  \"global\",\r\n    \"probeUrl\":  \"https://graph.microsoft.com/v1.0/me\",\r\n    \"providerType\":  \"ONE_DRIVE\",\r\n    \"configName\":  \"od-demo\",\r\n    \"oneDrivePassword\":  \"password\",\r\n    \"accessKeySecret\":  \"password\",\r\n    \"bucketName\":  \"drive\",\r\n    \"endpoint\":  \"https://graph.microsoft.com/v1.0\",\r\n    \"oneDriveUsername\":  \"user@example.com\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/cloud-storage/validate-config",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/cloud-storage/validate-config",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "DemoController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/demo/health",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/demo/health",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/demo/info",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/demo/info",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/demo/register",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/demo/register",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "FileController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/files/{{fileId}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "DELETE /api/files/{fileId}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/files/{{fileId}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/files/{fileId}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/files/{{fileId}}/download",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/files/{fileId}/download",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/files/my",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/files/my",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/files/public",
+                                                      "header":  [
+
+                                                                 ]
+                                                  },
+                                      "name":  "GET /api/files/public",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/files/upload",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/files/upload",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "MonitoringController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/monitoring/alerts",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/monitoring/alerts",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  "{{baseUrl}}/api/monitoring/alerts/{{alertId}}/close",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "PUT /api/monitoring/alerts/{alertId}/close",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/monitoring/alerts/test",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/monitoring/alerts/test",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/monitoring/cleanup",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "DELETE /api/monitoring/cleanup",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/monitoring/health",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/monitoring/health",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/monitoring/metrics",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/monitoring/metrics",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/monitoring/metrics/history",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/monitoring/metrics/history",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/monitoring/report",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/monitoring/report",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/monitoring/statistics",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/monitoring/statistics",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "PreviewController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/{{fileId}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/{fileId}",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/{{fileId}}/content",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/{fileId}/content",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/{{fileId}}/image",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/{fileId}/image",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/{{fileId}}/pdf",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/{fileId}/pdf",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/{{fileId}}/statistics",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/{fileId}/statistics",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/{{fileId}}/text",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/{fileId}/text",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/popular",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/popular",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/preview/user/statistics",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/preview/user/statistics",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "RecommendationController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/recommendations",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/recommendations",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  "{{baseUrl}}/api/recommendations/{{id}}/adopt",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "PUT /api/recommendations/{id}/adopt",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  "{{baseUrl}}/api/recommendations/{{id}}/view",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "PUT /api/recommendations/{id}/view",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/recommendations/analytics",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/recommendations/analytics",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/recommendations/cleanup",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "DELETE /api/recommendations/cleanup",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/recommendations/generate",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/recommendations/generate",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/recommendations/similar/{{itemId}}",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/recommendations/similar/{itemId}",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "UserController",
+                     "item":  [
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/users/change-password",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "POST /api/users/change-password",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/users/profile",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "GET /api/users/profile",
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "request":  {
+                                                      "body":  {
+                                                                   "raw":  "{\r\n\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "method":  "PUT",
+                                                      "url":  "{{baseUrl}}/api/users/profile",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "type":  "text",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{token}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "name":  "PUT /api/users/profile",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 }
+             ]
+}

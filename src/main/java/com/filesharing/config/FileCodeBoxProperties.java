@@ -8,7 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * FileCodeBox 兼容功能配置。
+ * 快传中心运行配置。
  */
 @Data
 @Configuration

@@ -2,7 +2,6 @@ package com.filesharing.service;
 
 import com.filesharing.dto.FileResponse;
 import com.filesharing.dto.FileUploadResponse;
-import com.filesharing.dto.request.MobileUploadRequest;
 import com.filesharing.dto.response.FileSimpleResponse;
 import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
@@ -101,13 +100,6 @@ public interface FileService {
      * 获取上传进度
      */
     Double getUploadProgress(String uploadId);
-    
-    // 移动端专用方法
-    
-    /**
-     * 移动端文件上传
-     */
-    FileUploadResponse uploadFile(MobileUploadRequest request, User uploader);
     
     /**
      * 获取最近文件

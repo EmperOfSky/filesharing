@@ -25,6 +25,11 @@ public class ShareResponse {
     private String expireTime;
     private Integer maxAccessCount;
     private Integer currentAccessCount;
+    private Integer pvCount;
+    private Integer uvCount;
+    private String lastVisitorIp;
+    private String lastVisitorAddress;
+    private String lastAccessAt;
     private String status;
     private Boolean allowDownload;
     private Boolean requiresPassword;

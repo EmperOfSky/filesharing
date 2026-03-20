@@ -4,16 +4,19 @@ import com.filesharing.dto.request.*;
 import com.filesharing.dto.response.*;
 import com.filesharing.entity.CollaborationProject;
 import com.filesharing.entity.CollaborativeDocument;
+import com.filesharing.entity.CollaborativeDocumentSnapshot;
 import com.filesharing.entity.Comment;
 import com.filesharing.entity.ProjectMember;
 import com.filesharing.entity.User;
 import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.CollaborationProjectRepository;
 import com.filesharing.repository.CollaborativeDocumentRepository;
+import com.filesharing.repository.CollaborativeDocumentSnapshotRepository;
 import com.filesharing.repository.CommentRepository;
 import com.filesharing.repository.ProjectMemberRepository;
 import com.filesharing.repository.UserRepository;
 import com.filesharing.service.CollaborationService;
+import com.filesharing.service.DocumentBlockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,12 +44,15 @@ import java.util.stream.Collectors;
 public class CollaborationServiceImpl implements CollaborationService {
 
     private static final String DOC_MARKER_PREFIX = "[#DOC:";
+    private static final String AUTO_SNAPSHOT_MESSAGE = "自动保存";
 
     private final CollaborationProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final CollaborativeDocumentRepository documentRepository;
+    private final CollaborativeDocumentSnapshotRepository snapshotRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
+    private final DocumentBlockService documentBlockService;
     
     @Override
     public CollaborationProjectResponse getProjectById(Long projectId) {
@@ -151,6 +157,13 @@ public class CollaborationServiceImpl implements CollaborationService {
         CollaborationProject project = findProject(projectId);
         if (!canManageProject(projectId, currentUser)) {
             throw new BusinessException("无权限删除项目");
+        }
+
+        List<CollaborativeDocument> projectDocuments = documentRepository
+                .findByProjectOrderByUpdatedAtDesc(project, Pageable.unpaged())
+                .getContent();
+        for (CollaborativeDocument projectDocument : projectDocuments) {
+            snapshotRepository.deleteByDocument(projectDocument);
         }
 
         documentRepository.deleteByProject(project);
@@ -317,6 +330,9 @@ public class CollaborationServiceImpl implements CollaborationService {
         document.setCommentCount(0);
 
         CollaborativeDocument saved = documentRepository.save(document);
+        int memberCount = (int) Math.max(1L, projectMemberRepository.countByProject(project));
+        documentBlockService.initDocumentBlocks(saved.getId(), memberCount, document.getContent());
+        persistDocumentSnapshot(saved, currentUser, "初始化版本");
 
         project.setFileCount(Math.toIntExact(documentRepository.countByProject(project)));
         project.setLastActivity(java.time.LocalDateTime.now());
@@ -357,6 +373,7 @@ public class CollaborationServiceImpl implements CollaborationService {
         document.setLastEditedAt(java.time.LocalDateTime.now());
 
         CollaborativeDocument saved = documentRepository.save(document);
+        persistDocumentSnapshot(saved, currentUser, AUTO_SNAPSHOT_MESSAGE);
         log.info("更新协作文档: 文档ID={}", documentId);
         return toDocumentResponse(saved, currentUser);
     }
@@ -367,6 +384,7 @@ public class CollaborationServiceImpl implements CollaborationService {
         if (!canDeleteDocument(documentId, currentUser)) {
             throw new BusinessException("无权限删除该文档");
         }
+        snapshotRepository.deleteByDocument(document);
         documentRepository.delete(document);
 
         CollaborationProject project = document.getProject();
@@ -439,6 +457,42 @@ public class CollaborationServiceImpl implements CollaborationService {
     @Override
     public boolean isDocumentLocked(Long documentId) {
         return Boolean.TRUE.equals(findDocument(documentId).getIsLocked());
+    }
+
+    @Override
+    public Page<CollaborativeDocumentSnapshotResponse> getDocumentSnapshots(Long documentId, Pageable pageable, User currentUser) {
+        CollaborativeDocument document = findDocument(documentId);
+        if (!canViewDocument(documentId, currentUser)) {
+            throw new BusinessException("无权限查看文档快照");
+        }
+
+        return snapshotRepository.findByDocumentOrderByCreatedAtDesc(document, pageable)
+                .map(this::toSnapshotResponse);
+    }
+
+    @Override
+    public CollaborativeDocumentResponse restoreDocumentSnapshot(Long documentId, Long snapshotId, User currentUser) {
+        CollaborativeDocument document = findDocument(documentId);
+        if (!canEditDocument(documentId, currentUser)) {
+            throw new BusinessException("无权限恢复文档快照");
+        }
+
+        CollaborativeDocumentSnapshot snapshot = snapshotRepository.findById(snapshotId)
+                .orElseThrow(() -> new BusinessException("文档快照不存在"));
+        if (!Objects.equals(snapshot.getDocument().getId(), documentId)) {
+            throw new BusinessException("快照不属于当前文档");
+        }
+
+        document.setDocumentName(snapshot.getTitle());
+        document.setContent(snapshot.getContent());
+        document.setVersion((document.getVersion() == null ? 0 : document.getVersion()) + 1);
+        document.setLastEditedBy(currentUser);
+        document.setLastEditedAt(java.time.LocalDateTime.now());
+
+        CollaborativeDocument saved = documentRepository.save(document);
+        persistDocumentSnapshot(saved, currentUser, "恢复自快照 #" + snapshot.getVersionNumber());
+
+        return toDocumentResponse(saved, currentUser);
     }
     
     @Override
@@ -813,6 +867,43 @@ public class CollaborationServiceImpl implements CollaborationService {
                 .email(user.getEmail())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
+                .build();
+    }
+
+    private void persistDocumentSnapshot(CollaborativeDocument document, User operator, String commitMessage) {
+        if (document == null || document.getId() == null) {
+            return;
+        }
+
+        Optional<CollaborativeDocumentSnapshot> latest = snapshotRepository.findTopByDocumentOrderByVersionNumberDesc(document);
+        if (latest.isPresent()) {
+            CollaborativeDocumentSnapshot latestSnapshot = latest.get();
+            boolean titleUnchanged = Objects.equals(latestSnapshot.getTitle(), document.getDocumentName());
+            boolean contentUnchanged = Objects.equals(latestSnapshot.getContent(), document.getContent());
+            if (titleUnchanged && contentUnchanged) {
+                return;
+            }
+        }
+
+        CollaborativeDocumentSnapshot snapshot = new CollaborativeDocumentSnapshot();
+        snapshot.setDocument(document);
+        snapshot.setVersionNumber(document.getVersion() == null ? 1 : document.getVersion());
+        snapshot.setTitle(document.getDocumentName() == null ? "未命名文档" : document.getDocumentName());
+        snapshot.setContent(document.getContent());
+        snapshot.setCommitMessage(commitMessage);
+        snapshot.setCreatedBy(operator);
+        snapshotRepository.save(snapshot);
+    }
+
+    private CollaborativeDocumentSnapshotResponse toSnapshotResponse(CollaborativeDocumentSnapshot snapshot) {
+        return CollaborativeDocumentSnapshotResponse.builder()
+                .id(snapshot.getId())
+                .documentId(snapshot.getDocument() == null ? null : snapshot.getDocument().getId())
+                .versionNumber(snapshot.getVersionNumber())
+                .title(snapshot.getTitle())
+                .commitMessage(snapshot.getCommitMessage())
+                .createdBy(toUserSimple(snapshot.getCreatedBy()))
+                .createdAt(snapshot.getCreatedAt())
                 .build();
     }
 

@@ -1,6 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
-import { useAuthStore } from '@/stores/auth'
 
 class HttpClient {
   private instance: AxiosInstance
@@ -21,9 +20,9 @@ class HttpClient {
     // 请求拦截器
     this.instance.interceptors.request.use(
       (config) => {
-        const authStore = useAuthStore()
-        if (authStore.token) {
-          config.headers.Authorization = `Bearer ${authStore.token}`
+        const token = localStorage.getItem('token')
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
         }
 
         // FormData must not keep a fixed Content-Type header,
@@ -51,8 +50,7 @@ class HttpClient {
       },
       (error) => {
         if (error.response?.status === 401) {
-          const authStore = useAuthStore()
-          authStore.logout()
+          localStorage.removeItem('token')
           window.location.href = '/login'
         }
         

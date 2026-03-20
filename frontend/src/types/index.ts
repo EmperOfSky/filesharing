@@ -36,45 +36,10 @@ export interface Folder {
   name: string
   parentId?: number
   ownerId: number
-  createdAt: string
-  updatedAt: string
-}
-
-// 分享相关类型
-export interface ShareRecord {
-  id: number
-  shareKey: string
-  shareType: 'FILE' | 'FOLDER'
-  sharedContent?: {
-    id: number
-    name: string
-    size?: number
-    contentType?: string
-    path?: string
-  }
-  sharerId: number
-  sharerName: string
-  title?: string
   description?: string
-  requiresPassword: boolean
-  allowDownload: boolean
-  shortLink: string
-  accessUrl: string
-  downloadUrl?: string
-  expireTime?: string
-  maxAccessCount: number
-  currentAccessCount: number
-  status: 'ACTIVE' | 'EXPIRED' | 'DISABLED'
+  folderPath?: string
   createdAt: string
   updatedAt: string
-}
-
-// API响应类型
-export interface ApiResponse<T> {
-  code: number
-  message: string
-  data: T
-  timestamp: string
 }
 
 export interface PaginatedResponse<T> {
@@ -120,4 +85,186 @@ export interface SearchResponse {
   files: FileItem[]
   folders: Folder[]
   totalResults: number
+}
+
+export type RecycleBinItemType = 'FILE' | 'FOLDER'
+
+export interface RecycleBinItem {
+  id: number
+  itemId: number
+  itemType: RecycleBinItemType | string
+  originalName: string
+  originalPath: string
+  fileSize: number
+  fileType: string
+  deletedByName: string
+  deletedAt: string
+  expireAt: string
+  isRecoverable: boolean
+  deleteReason?: string
+}
+
+export interface RestoreResult {
+  success: boolean
+  message: string
+  restoredItemId?: number
+  restoredItemType?: string
+  restorePath?: string
+}
+
+export interface RecycleBinStats {
+  totalItems: number
+  fileCount: number
+  folderCount: number
+  expiredCount: number
+  recoverableCount: number
+  oldestItemDate?: string
+  newestItemDate?: string
+}
+
+export interface ExpiringRecycleItem {
+  id: number
+  itemName: string
+  itemType: string
+  expireTime: string
+  hoursLeft: number
+}
+
+export interface BatchOperationResult {
+  totalCount: number
+  successCount: number
+  failedCount: number
+  failedItems: string[]
+}
+
+export type RecommendationType = 'FILE' | 'FOLDER' | 'TAG' | 'COLLABORATION' | 'SEARCH_RESULT'
+
+export type RecommendationSourceType =
+  | 'AI_MODEL'
+  | 'USER_BEHAVIOR'
+  | 'COLLABORATION_PATTERN'
+  | 'CONTENT_SIMILARITY'
+
+export interface SmartRecommendation {
+  id: number
+  recommendationType: RecommendationType | string
+  itemId?: number
+  reason?: string
+  relevanceScore?: number
+  sourceType?: RecommendationSourceType | string
+  sourceModelId?: number
+  isViewed: boolean
+  isAdopted: boolean
+  viewedAt?: string
+  adoptedAt?: string
+  tags?: string
+  createdAt?: string
+  expireAt?: string
+}
+
+export interface RecommendationAnalytics {
+  totalRecommendations: number
+  viewedRecommendations: number
+  adoptedRecommendations: number
+  viewRate: number
+  adoptionRate: number
+  typeDistribution?: Record<string, number>
+  sourceDistribution?: Record<string, number>
+}
+
+export interface RecommendationListResponse {
+  content?: SmartRecommendation[]
+  recommendations?: SmartRecommendation[]
+  number?: number
+  currentPage?: number
+  totalPages?: number
+  totalElements?: number
+  numberOfElements?: number
+  size?: number
+  first?: boolean
+  last?: boolean
+}
+
+export interface RecommendationCleanupResult {
+  message?: string
+  timestamp?: number
+}
+
+export type BackupType = 'FULL' | 'INCREMENTAL'
+
+export interface BackupResult {
+  taskId: string
+  success: boolean
+  message: string
+  backupPath: string
+}
+
+export interface BackupTask {
+  taskId: string
+  backupName: string
+  backupType: BackupType | string
+  status: string
+  startTime?: string
+  endTime?: string
+  success?: boolean
+  errorMessage?: string
+  dbBackupPath?: string
+  filesBackupPath?: string
+  metadataPath?: string
+  backedUpFileCount?: number
+}
+
+export interface BackupInfo {
+  backupName: string
+  backupPath: string
+  backupType: BackupType | string
+  createTime: string
+  includeFiles: boolean
+  totalFileSize: number
+  fileCount: number
+  valid: boolean
+}
+
+export interface BackupCleanupResult {
+  startTime?: string
+  endTime?: string
+  success: boolean
+  message: string
+  deletedCount: number
+  deletedBackups: string[]
+  failedDeletions: string[]
+}
+
+export interface BackupStatistics {
+  totalBackups: number
+  totalBackupSize: number
+  fullBackupCount: number
+  incrementalBackupCount: number
+  latestBackupTime?: string
+  backupBasePath?: string
+  maxBackupSize?: string
+}
+
+export interface BackupValidationResult {
+  backupPath: string
+  isValid: boolean
+  validationTime: number
+  message: string
+}
+
+export interface BackupConfig {
+  backupBasePath?: string
+  maxBackupSize?: string
+  compressionLevel?: number
+  retentionDays?: number
+  autoBackupEnabled?: boolean
+  exportTime?: number
+  [key: string]: any
+}
+
+export interface BackupAsyncRequestResult {
+  taskId: string
+  requestId?: string
+  message: string
+  status: string
 }

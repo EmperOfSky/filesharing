@@ -92,6 +92,36 @@ public class ShareRecord {
      */
     @Column(name = "current_access_count")
     private Integer currentAccessCount = 0;
+
+    /**
+     * 短链接总点击量（PV）
+     */
+    @Column(name = "pv_count")
+    private Integer pvCount = 0;
+
+    /**
+     * 短链接独立访客数（UV）
+     */
+    @Column(name = "uv_count")
+    private Integer uvCount = 0;
+
+    /**
+     * 最近访客IP
+     */
+    @Column(name = "last_visitor_ip", length = 64)
+    private String lastVisitorIp;
+
+    /**
+     * 最近访客地址
+     */
+    @Column(name = "last_visitor_address", length = 255)
+    private String lastVisitorAddress;
+
+    /**
+     * 最近点击时间
+     */
+    @Column(name = "last_access_at")
+    private LocalDateTime lastAccessAt;
     
     /**
      * 分享状态：ACTIVE, EXPIRED, DISABLED

@@ -1,2 +1,42 @@
 # 屏蔽前端 node_modules 文件夹
 frontend/node_modules/
+target/
+
+# 运行期与测试临时文件
+temp/
+
+# 历史归档目录
+archive/
+
+# 文档站点构建缓存
+old_python_example/docs/.vitepress/cache/
+
+# 常用忽略项（由 Copilot 添加）
+# IDE / 编辑器
+.idea/
+.vscode/
+
+# Node / frontend
+/node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Java / Maven
+/target/
+
+# 项目临时、上传与缓存目录
+/temp/
+/uploads/
+/data/
+/backups/
+
+# 日志与环境配置
+*.log
+logs/
+.env
+.env.local
+
+# 系统文件
+.DS_Store
+Thumbs.db

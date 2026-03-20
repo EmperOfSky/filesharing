@@ -1,5 +1,13 @@
 server:
-  port: 8080
+  port: ${HTTPS_PORT:8443}
+  http:
+    port: ${HTTP_PORT:8080}
+  ssl:
+    enabled: ${HTTPS_ENABLED:true}
+    key-store: ${HTTPS_KEY_STORE:classpath:certs/keystore.p12}
+    key-store-password: ${HTTPS_KEY_STORE_PASSWORD:changeit}
+    key-store-type: PKCS12
+    key-alias: ${HTTPS_KEY_ALIAS:filesharing}
 
 spring:
   application:
@@ -7,10 +15,10 @@ spring:
   
   # 数据库配置 - MySQL
   datasource:
-    url: jdbc:mysql://localhost:3306/filesharing?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/filesharing?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: root
-    password: 123456 
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
@@ -43,8 +51,8 @@ spring:
 # 文件存储配置
 file:
   upload:
-    path: ./uploads/
-    temp-path: ./temp/
+    path: ${FILE_UPLOAD_PATH:./uploads/}
+    temp-path: ${FILE_UPLOAD_TEMP_PATH:./temp/}
     max-size: 104857600  # 100MB
     allowed-types: 
       - image/jpeg
@@ -58,6 +66,21 @@ file:
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       - video/mp4
       - audio/mpeg
+
+# 存储后端配置：local 或 minio
+storage:
+  type: ${STORAGE_TYPE:minio}
+  minio:
+    endpoint: ${STORAGE_MINIO_ENDPOINT:http://127.0.0.1:9000}
+    access-key: ${STORAGE_MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${STORAGE_MINIO_SECRET_KEY:minioadmin}
+    bucket: ${STORAGE_MINIO_BUCKET:filesharing}
+    base-path: ${STORAGE_MINIO_BASE_PATH:app}
+
+backup:
+  base-path: ${BACKUP_BASE_PATH:./backups/}
+  max-size: ${BACKUP_MAX_SIZE:10737418240}
+  compression-level: ${BACKUP_COMPRESSION_LEVEL:6}
 
 # 额外上传相关配置（被新的后端校验使用）
 upload:
@@ -97,7 +120,7 @@ management:
       exposure:
         include: health,info,metrics
 
-# FileCodeBox 兼容配置
+# 快传配置（兼容 fcb 前缀）
 fcb:
   open-upload: true
   upload-size: 10485760
@@ -109,3 +132,8 @@ fcb:
   expire-styles: day,hour,minute,forever,count
   presign-expire-seconds: 900
   download-token-ttl-seconds: 600
+
+# GeoIP 地址解析配置
+geoip:
+  service-url: https://ipwho.is/{ip}
+  timeout-ms: 3000

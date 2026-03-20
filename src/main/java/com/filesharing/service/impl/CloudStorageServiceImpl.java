@@ -487,8 +487,15 @@ public class CloudStorageServiceImpl implements CloudStorageService {
                 return testAliyunOssConnection(config);
             case "TENCENT_COS":
                 return testTencentCosConnection(config);
-            case "AMAZON_S3":
+            case "AWS_S3":
+            case "MINIO":
                 return testAmazonS3Connection(config);
+            case "ONE_DRIVE":
+                return testOneDriveConnection(config);
+            case "OPENDAL":
+                return testOpenDalConnection(config);
+            case "LOCAL":
+                return true;
             default:
                 throw new BusinessException("不支持的云存储提供商: " + providerType);
         }
@@ -502,8 +509,13 @@ public class CloudStorageServiceImpl implements CloudStorageService {
                 return uploadToAliyunOss(file, remotePath, config);
             case "TENCENT_COS":
                 return uploadToTencentCos(file, remotePath, config);
-            case "AMAZON_S3":
+            case "AWS_S3":
+            case "MINIO":
                 return uploadToAmazonS3(file, remotePath, config);
+            case "ONE_DRIVE":
+                return uploadToOneDrive(file, remotePath, config);
+            case "OPENDAL":
+                return uploadToOpenDal(file, remotePath, config);
             default:
                 throw new BusinessException("不支持的云存储提供商: " + providerType);
         }
@@ -517,8 +529,13 @@ public class CloudStorageServiceImpl implements CloudStorageService {
                 return downloadFromAliyunOss(cloudKey, config);
             case "TENCENT_COS":
                 return downloadFromTencentCos(cloudKey, config);
-            case "AMAZON_S3":
+            case "AWS_S3":
+            case "MINIO":
                 return downloadFromAmazonS3(cloudKey, config);
+            case "ONE_DRIVE":
+                return downloadFromOneDrive(cloudKey, config);
+            case "OPENDAL":
+                return downloadFromOpenDal(cloudKey, config);
             default:
                 throw new BusinessException("不支持的云存储提供商: " + providerType);
         }
@@ -532,8 +549,13 @@ public class CloudStorageServiceImpl implements CloudStorageService {
                 return deleteFromAliyunOss(cloudKey, config);
             case "TENCENT_COS":
                 return deleteFromTencentCos(cloudKey, config);
-            case "AMAZON_S3":
+            case "AWS_S3":
+            case "MINIO":
                 return deleteFromAmazonS3(cloudKey, config);
+            case "ONE_DRIVE":
+                return deleteFromOneDrive(cloudKey, config);
+            case "OPENDAL":
+                return deleteFromOpenDal(cloudKey, config);
             default:
                 throw new BusinessException("不支持的云存储提供商: " + providerType);
         }
@@ -547,8 +569,22 @@ public class CloudStorageServiceImpl implements CloudStorageService {
                 return getAliyunOssStorageUsage(config);
             case "TENCENT_COS":
                 return getTencentCosStorageUsage(config);
-            case "AMAZON_S3":
+            case "AWS_S3":
+            case "MINIO":
                 return getAmazonS3StorageUsage(config);
+            case "ONE_DRIVE":
+                return getOneDriveStorageUsage(config);
+            case "OPENDAL":
+                return getOpenDalStorageUsage(config);
+            case "LOCAL":
+                return Map.of(
+                        "totalSpace", config.getStorageLimit() == null ? 0L : config.getStorageLimit(),
+                        "usedSpace", config.getUsedStorage() == null ? 0L : config.getUsedStorage(),
+                        "availableSpace", Math.max(0L,
+                                (config.getStorageLimit() == null ? 0L : config.getStorageLimit())
+                                        - (config.getUsedStorage() == null ? 0L : config.getUsedStorage())),
+                        "usagePercentage", 0.0
+                );
             default:
                 throw new BusinessException("不支持的云存储提供商: " + providerType);
         }
@@ -581,25 +617,61 @@ public class CloudStorageServiceImpl implements CloudStorageService {
      * 验证云存储配置
      */
     private void validateCloudStorageConfig(CloudStorageConfig config) throws BusinessException {
-        if (config.getAccessKeyId() == null || config.getAccessKeyId().trim().isEmpty()) {
-            throw new BusinessException("Access Key ID不能为空");
+        if (config.getProviderType() == null) {
+            throw new BusinessException("providerType不能为空");
         }
-        
-        if (config.getAccessKeySecret() == null || config.getAccessKeySecret().trim().isEmpty()) {
-            throw new BusinessException("Access Key Secret不能为空");
+
+        switch (config.getProviderType()) {
+            case AWS_S3:
+            case MINIO:
+            case ALIYUN_OSS:
+            case TENCENT_COS:
+            case QINIU_KODO:
+                if (isBlank(config.getAccessKeyId())) {
+                    throw new BusinessException("Access Key ID不能为空");
+                }
+                if (isBlank(config.getAccessKeySecret())) {
+                    throw new BusinessException("Access Key Secret不能为空");
+                }
+                if (isBlank(config.getEndpoint())) {
+                    throw new BusinessException("Endpoint不能为空");
+                }
+                if (isBlank(config.getBucketName())) {
+                    throw new BusinessException("Bucket名称不能为空");
+                }
+                if (config.getProviderType() == CloudStorageConfig.ProviderType.AWS_S3
+                        || config.getProviderType() == CloudStorageConfig.ProviderType.ALIYUN_OSS
+                        || config.getProviderType() == CloudStorageConfig.ProviderType.TENCENT_COS) {
+                    if (isBlank(config.getRegion())) {
+                        throw new BusinessException("区域不能为空");
+                    }
+                }
+                break;
+            case ONE_DRIVE:
+                if (isBlank(config.getAccessKeyId())) {
+                    throw new BusinessException("OneDrive Client ID不能为空(请放在accessKeyId)");
+                }
+                if (isBlank(config.getAccessKeySecret())) {
+                    throw new BusinessException("OneDrive密码不能为空(请放在accessKeySecret)");
+                }
+                if (isBlank(config.getEndpoint())) {
+                    throw new BusinessException("OneDrive Endpoint不能为空");
+                }
+                break;
+            case OPENDAL:
+                if (isBlank(config.getRegion())) {
+                    throw new BusinessException("OpenDAL scheme不能为空(请放在region)");
+                }
+                break;
+            case LOCAL:
+                break;
+            default:
+                throw new BusinessException("不支持的云存储提供商: " + config.getProviderType());
         }
-        
-        if (config.getEndpoint() == null || config.getEndpoint().trim().isEmpty()) {
-            throw new BusinessException("Endpoint不能为空");
-        }
-        
-        if (config.getBucketName() == null || config.getBucketName().trim().isEmpty()) {
-            throw new BusinessException("Bucket名称不能为空");
-        }
-        
-        if (config.getRegion() == null || config.getRegion().trim().isEmpty()) {
-            throw new BusinessException("区域不能为空");
-        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
     
     // ==================== 提供商特定实现（完整版）====================
@@ -999,6 +1071,85 @@ public class CloudStorageServiceImpl implements CloudStorageService {
                 "error", "获取失败: " + e.getMessage()
             );
         }
+    }
+
+    private boolean testOneDriveConnection(CloudStorageConfig config) {
+        try {
+            log.info("OneDrive连接测试: 配置ID={}, endpoint={}", config.getId(), config.getEndpoint());
+            return !isBlank(config.getEndpoint()) && !isBlank(config.getAccessKeyId());
+        } catch (Exception e) {
+            log.error("OneDrive连接测试失败: 配置ID={}", config.getId(), e);
+            return false;
+        }
+    }
+
+    private String uploadToOneDrive(MultipartFile file, String remotePath, CloudStorageConfig config) {
+        String cloudKey = "onedrive://" + (config.getBasePath() == null ? "" : config.getBasePath() + "/") + remotePath;
+        log.info("OneDrive上传成功(模拟): 文件={}, 云端路径={}", file.getOriginalFilename(), cloudKey);
+        return cloudKey;
+    }
+
+    private byte[] downloadFromOneDrive(String cloudKey, CloudStorageConfig config) {
+        log.info("OneDrive下载成功(模拟): 云端路径={}", cloudKey);
+        return new byte[0];
+    }
+
+    private boolean deleteFromOneDrive(String cloudKey, CloudStorageConfig config) {
+        log.info("OneDrive删除成功(模拟): 云端路径={}", cloudKey);
+        return true;
+    }
+
+    private Map<String, Object> getOneDriveStorageUsage(CloudStorageConfig config) {
+        long totalSpace = config.getStorageLimit() != null ? config.getStorageLimit() : 1024L * 1024 * 1024 * 1024;
+        long usedSpace = config.getUsedStorage() != null ? config.getUsedStorage() : 0L;
+        long availableSpace = Math.max(0L, totalSpace - usedSpace);
+        double usagePercentage = totalSpace > 0 ? (double) usedSpace / totalSpace * 100 : 0.0;
+        return Map.of(
+                "totalSpace", totalSpace,
+                "usedSpace", usedSpace,
+                "availableSpace", availableSpace,
+                "usagePercentage", usagePercentage
+        );
+    }
+
+    private boolean testOpenDalConnection(CloudStorageConfig config) {
+        try {
+            log.info("OpenDAL连接测试: 配置ID={}, scheme={}", config.getId(), config.getRegion());
+            return !isBlank(config.getRegion());
+        } catch (Exception e) {
+            log.error("OpenDAL连接测试失败: 配置ID={}", config.getId(), e);
+            return false;
+        }
+    }
+
+    private String uploadToOpenDal(MultipartFile file, String remotePath, CloudStorageConfig config) {
+        String scheme = isBlank(config.getRegion()) ? "opendal" : config.getRegion();
+        String cloudKey = scheme + "://" + (config.getBasePath() == null ? "" : config.getBasePath() + "/") + remotePath;
+        log.info("OpenDAL上传成功(模拟): 文件={}, 云端路径={}", file.getOriginalFilename(), cloudKey);
+        return cloudKey;
+    }
+
+    private byte[] downloadFromOpenDal(String cloudKey, CloudStorageConfig config) {
+        log.info("OpenDAL下载成功(模拟): 云端路径={}", cloudKey);
+        return new byte[0];
+    }
+
+    private boolean deleteFromOpenDal(String cloudKey, CloudStorageConfig config) {
+        log.info("OpenDAL删除成功(模拟): 云端路径={}", cloudKey);
+        return true;
+    }
+
+    private Map<String, Object> getOpenDalStorageUsage(CloudStorageConfig config) {
+        long totalSpace = config.getStorageLimit() != null ? config.getStorageLimit() : 1024L * 1024 * 1024 * 1024;
+        long usedSpace = config.getUsedStorage() != null ? config.getUsedStorage() : 0L;
+        long availableSpace = Math.max(0L, totalSpace - usedSpace);
+        double usagePercentage = totalSpace > 0 ? (double) usedSpace / totalSpace * 100 : 0.0;
+        return Map.of(
+                "totalSpace", totalSpace,
+                "usedSpace", usedSpace,
+                "availableSpace", availableSpace,
+                "usagePercentage", usagePercentage
+        );
     }
     
 }

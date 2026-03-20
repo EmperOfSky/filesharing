@@ -17,8 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,8 +51,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Transactional
 public class FileCodeBoxService {
 
-    private static final String NUMERIC_CHARS = "23456789";
     private static final String STRING_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    private static final int PICKUP_CODE_LENGTH = 32;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final PickupCodeRecordRepository pickupCodeRecordRepository;
@@ -472,15 +475,9 @@ public class FileCodeBoxService {
             session.expiredCount = overridePolicy.expiredCount;
         }
 
-        Path uploadRoot = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-        Path target = uploadRoot.resolve(session.relativePath).normalize();
-        if (!target.startsWith(uploadRoot)) {
-            throw new BusinessException("INVALID_PATH", "非法文件保存路径");
-        }
-        Files.createDirectories(target.getParent());
-
         Path chunkDir = getChunkTempDir(uploadId);
-        try (OutputStream output = Files.newOutputStream(target)) {
+        byte[] mergedBytes;
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             for (int i = 0; i < session.totalChunks; i++) {
                 Path chunkPath = chunkDir.resolve("part_" + i + ".part").normalize();
                 if (!chunkPath.startsWith(chunkDir) || !Files.exists(chunkPath)) {
@@ -488,12 +485,23 @@ public class FileCodeBoxService {
                 }
                 Files.copy(chunkPath, output);
             }
+            mergedBytes = output.toByteArray();
+        }
+
+        String contentType = detectContentType(session.fileName);
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(mergedBytes)) {
+            fileStorageUtil.saveInputStreamAtPath(
+                    inputStream,
+                    mergedBytes.length,
+                    session.relativePath,
+                    contentType
+            );
         }
 
         Map<String, Object> detail = createLocalFileShareRecord(
                 session.fileName,
-                detectContentType(target),
-                session.fileSize,
+                contentType,
+                mergedBytes.length,
                 session.relativePath,
                 session.expireStyle,
                 session.expireAt,
@@ -942,7 +950,7 @@ public class FileCodeBoxService {
 
     private String generateUniqueCode(String expireStyle) {
         for (int i = 0; i < 20; i++) {
-            String candidate = "forever".equals(expireStyle) ? randomCode(8, STRING_CHARS) : randomCode(6, NUMERIC_CHARS);
+            String candidate = randomCode(PICKUP_CODE_LENGTH, STRING_CHARS);
             if (!pickupCodeRecordRepository.existsByCode(candidate)) {
                 return candidate;
             }
@@ -1077,13 +1085,13 @@ public class FileCodeBoxService {
         }
     }
 
-    private String detectContentType(Path filePath) {
-        try {
-            String detected = Files.probeContentType(filePath);
-            return detected == null || detected.isBlank() ? "application/octet-stream" : detected;
-        } catch (IOException ex) {
+    private String detectContentType(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
             return "application/octet-stream";
         }
+
+        String detected = URLConnection.guessContentTypeFromName(fileName);
+        return (detected == null || detected.isBlank()) ? "application/octet-stream" : detected;
     }
 
     private String sha256Hex(byte[] data) {

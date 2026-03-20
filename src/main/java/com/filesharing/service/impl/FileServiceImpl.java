@@ -3,7 +3,6 @@ package com.filesharing.service.impl;
 import com.filesharing.util.FileStorageUtil;
 import com.filesharing.dto.FileUploadResponse;
 import com.filesharing.dto.FileResponse;
-import com.filesharing.dto.request.MobileUploadRequest;
 import com.filesharing.dto.response.FileSimpleResponse;
 import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.Folder;
@@ -22,12 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 /**
@@ -46,11 +41,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class FileServiceImpl implements FileService {
+
+    private static final long USER_FILE_QUERY_CACHE_TTL_MILLIS = 5000L;
     
     private final FileRepository fileRepository;
     private final FolderRepository folderRepository;
     private final FileStorageUtil fileStorageUtil;
     private final ConcurrentMap<Long, Set<Long>> userFavoriteFileIds = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ReentrantLock> uploadLocks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ReentrantLock> userFileQueryLocks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, CacheEntry<List<FileResponse>>> userFileQueryCache = new ConcurrentHashMap<>();
     
     @Override
     public FileUploadResponse uploadFile(MultipartFile file, Long folderId, User uploader) {
@@ -74,83 +74,64 @@ public class FileServiceImpl implements FileService {
             // 检查文件是否已存在（秒传功能）
             FileEntity existingFile = checkFileExists(md5Hash);
             if (existingFile != null) {
-                boolean sameOwner = existingFile.getUploader() != null
-                    && existingFile.getUploader().getId().equals(uploader.getId());
-                boolean sameFolder = (existingFile.getFolder() == null && targetFolder == null)
-                    || (existingFile.getFolder() != null && targetFolder != null
-                    && existingFile.getFolder().getId().equals(targetFolder.getId()));
-
-                if (sameOwner && sameFolder) {
-                    log.info("文件秒传成功（复用已有记录）：{} -> {}", file.getOriginalFilename(), existingFile.getStorageName());
-                    return FileUploadResponse.builder()
-                        .id(existingFile.getId())
-                        .originalName(existingFile.getOriginalName())
-                        .storageName(existingFile.getStorageName())
-                        .fileSize(existingFile.getFileSize())
-                        .contentType(existingFile.getContentType())
-                        .downloadUrl("/api/files/" + existingFile.getId() + "/download")
-                        .previewUrl("/api/files/" + existingFile.getId() + "/preview")
-                        .isNewlyUploaded(false)
-                        .message("文件秒传成功")
-                        .build();
-                }
-
-                FileEntity copiedMeta = createFastUploadCopy(existingFile, file, targetFolder, uploader, md5Hash);
-                long usedStorage = uploader.getUsedStorage() == null ? 0L : uploader.getUsedStorage();
-                uploader.setUsedStorage(usedStorage + copiedMeta.getFileSize());
-
-                log.info("文件秒传成功（创建当前用户副本）：{} -> {}", file.getOriginalFilename(), copiedMeta.getStorageName());
-                return FileUploadResponse.builder()
-                    .id(copiedMeta.getId())
-                    .originalName(copiedMeta.getOriginalName())
-                    .storageName(copiedMeta.getStorageName())
-                    .fileSize(copiedMeta.getFileSize())
-                    .contentType(copiedMeta.getContentType())
-                    .downloadUrl("/api/files/" + copiedMeta.getId() + "/download")
-                    .previewUrl("/api/files/" + copiedMeta.getId() + "/preview")
-                    .isNewlyUploaded(false)
-                    .message("文件秒传成功")
-                    .build();
+                return buildFastUploadResponse(existingFile, file, targetFolder, uploader, md5Hash);
             }
+
+            // 双重校验锁：首次检查未命中后，加锁再查一次，避免并发重复落库。
+            String uploadLockKey = buildUploadLockKey(uploader.getId(), folderId, md5Hash);
+            ReentrantLock uploadLock = uploadLocks.computeIfAbsent(uploadLockKey, key -> new ReentrantLock());
+            uploadLock.lock();
+            try {
+                FileEntity lockedCheck = checkFileExists(md5Hash);
+                if (lockedCheck != null) {
+                    return buildFastUploadResponse(lockedCheck, file, targetFolder, uploader, md5Hash);
+                }
             
-            // 实际上传文件
-            String storageName = fileStorageUtil.saveFile(file);
-            String originalFilename = file.getOriginalFilename();
-            String extension = fileStorageUtil.getFileExtension(originalFilename);
+                // 实际上传文件
+                String storageName = fileStorageUtil.saveFile(file);
+                String originalFilename = file.getOriginalFilename();
+                String extension = fileStorageUtil.getFileExtension(originalFilename);
             
-            // 创建文件实体
-            FileEntity fileEntity = new FileEntity();
-            fileEntity.setOriginalName(originalFilename);
-            fileEntity.setStorageName(storageName);
-            fileEntity.setFilePath("/uploads/" + storageName);
-            fileEntity.setFileSize(file.getSize());
-            fileEntity.setContentType(file.getContentType());
-            fileEntity.setExtension(extension);
-            fileEntity.setMd5Hash(md5Hash);
-            fileEntity.setStatus(FileEntity.FileStatus.AVAILABLE);
-            fileEntity.setUploader(uploader);
-            fileEntity.setFolder(targetFolder);
+                // 创建文件实体
+                FileEntity fileEntity = new FileEntity();
+                fileEntity.setOriginalName(originalFilename);
+                fileEntity.setStorageName(storageName);
+                fileEntity.setFilePath("/uploads/" + storageName);
+                fileEntity.setFileSize(file.getSize());
+                fileEntity.setContentType(file.getContentType());
+                fileEntity.setExtension(extension);
+                fileEntity.setMd5Hash(md5Hash);
+                fileEntity.setStatus(FileEntity.FileStatus.AVAILABLE);
+                fileEntity.setUploader(uploader);
+                fileEntity.setFolder(targetFolder);
             
-            // 保存文件实体
-            FileEntity savedFile = fileRepository.save(fileEntity);
+                // 保存文件实体
+                FileEntity savedFile = fileRepository.save(fileEntity);
             
-            // 更新用户存储使用量
-            long usedStorage = uploader.getUsedStorage() == null ? 0L : uploader.getUsedStorage();
-            uploader.setUsedStorage(usedStorage + file.getSize());
+                // 更新用户存储使用量
+                long usedStorage = uploader.getUsedStorage() == null ? 0L : uploader.getUsedStorage();
+                uploader.setUsedStorage(usedStorage + file.getSize());
+                invalidateUserFileQueryCache(uploader.getId());
             
-            log.info("文件上传成功：{} -> {}", originalFilename, storageName);
+                log.info("文件上传成功：{} -> {}", originalFilename, storageName);
                         
-            return FileUploadResponse.builder()
-                    .id(savedFile.getId())
-                    .originalName(savedFile.getOriginalName())
-                    .storageName(savedFile.getStorageName())
-                    .fileSize(savedFile.getFileSize())
-                    .contentType(savedFile.getContentType())
-                    .downloadUrl("/api/files/" + savedFile.getId() + "/download")
-                    .previewUrl("/api/files/" + savedFile.getId() + "/preview")
-                    .isNewlyUploaded(true)
-                    .message("文件上传成功")
-                    .build();
+                return FileUploadResponse.builder()
+                        .id(savedFile.getId())
+                        .originalName(savedFile.getOriginalName())
+                        .storageName(savedFile.getStorageName())
+                        .fileSize(savedFile.getFileSize())
+                        .contentType(savedFile.getContentType())
+                        .downloadUrl("/api/files/" + savedFile.getId() + "/download")
+                        .previewUrl("/api/files/" + savedFile.getId() + "/preview")
+                        .isNewlyUploaded(true)
+                        .message("文件上传成功")
+                        .build();
+            } finally {
+                uploadLock.unlock();
+                if (!uploadLock.hasQueuedThreads()) {
+                    uploadLocks.remove(uploadLockKey, uploadLock);
+                }
+            }
                     
         } catch (BusinessException e) {
             log.error("业务异常 - 文件上传失败: {}", e.getMessage());
@@ -173,18 +154,40 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(readOnly = true)
     public List<FileResponse> getUserFiles(User user, String fileName, int page, int size) {
-        var pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1), Sort.by(Sort.Direction.DESC, "createdAt"));
-        boolean hasKeyword = fileName != null && !fileName.trim().isEmpty();
-        var pageResult = hasKeyword
-            ? fileRepository.findByUploaderAndOriginalNameContaining(user, fileName.trim(), pageable)
-            : fileRepository.findByUploader(user, pageable);
+        String queryKey = buildUserQueryKey(user, fileName, page, size);
+        List<FileResponse> cached = getCachedUserQueryResult(queryKey);
+        if (cached != null) {
+            return new java.util.ArrayList<>(cached);
+        }
 
-        return pageResult
-                .getContent()
-                .stream()
-            .filter(file -> file.getStatus() == FileEntity.FileStatus.AVAILABLE)
-                .map(this::convertToFileResponse)
-                .collect(Collectors.toList());
+        ReentrantLock queryLock = userFileQueryLocks.computeIfAbsent(queryKey, key -> new ReentrantLock());
+        queryLock.lock();
+        var pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1), Sort.by(Sort.Direction.DESC, "createdAt"));
+        try {
+            List<FileResponse> recheckedCached = getCachedUserQueryResult(queryKey);
+            if (recheckedCached != null) {
+                return new java.util.ArrayList<>(recheckedCached);
+            }
+
+            boolean hasKeyword = fileName != null && !fileName.trim().isEmpty();
+            var pageResult = hasKeyword
+                ? fileRepository.findByUploaderAndOriginalNameContaining(user, fileName.trim(), pageable)
+                : fileRepository.findByUploader(user, pageable);
+
+            List<FileResponse> result = pageResult
+                    .getContent()
+                    .stream()
+                    .filter(file -> file.getStatus() == FileEntity.FileStatus.AVAILABLE)
+                    .map(this::convertToFileResponse)
+                    .collect(Collectors.toList());
+            cacheUserQueryResult(queryKey, result);
+            return result;
+        } finally {
+            queryLock.unlock();
+            if (!queryLock.hasQueuedThreads()) {
+                userFileQueryLocks.remove(queryKey, queryLock);
+            }
+        }
     }
     
     @Override
@@ -221,6 +224,7 @@ public class FileServiceImpl implements FileService {
         fileEntity.setStatus(FileEntity.FileStatus.DELETED);
         fileEntity.setDeletedAt(LocalDateTime.now());
         fileRepository.save(fileEntity);
+        invalidateUserFileQueryCache(currentUser.getId());
         
         log.info("文件删除成功: {}", fileEntity.getOriginalName());
     }
@@ -232,6 +236,7 @@ public class FileServiceImpl implements FileService {
 
         fileEntity.setFolder(targetFolder);
         FileEntity saved = fileRepository.save(fileEntity);
+        invalidateUserFileQueryCache(currentUser.getId());
         return convertToFileResponse(saved);
     }
     
@@ -247,6 +252,7 @@ public class FileServiceImpl implements FileService {
         fileEntity.setExtension(getFileExtension(trimmedName));
 
         FileEntity saved = fileRepository.save(fileEntity);
+        invalidateUserFileQueryCache(currentUser.getId());
         return convertToFileResponse(saved);
     }
 
@@ -260,6 +266,7 @@ public class FileServiceImpl implements FileService {
         long usedStorage = currentUser.getUsedStorage() == null ? 0L : currentUser.getUsedStorage();
         long fileSize = copied.getFileSize() == null ? 0L : copied.getFileSize();
         currentUser.setUsedStorage(usedStorage + fileSize);
+        invalidateUserFileQueryCache(currentUser.getId());
 
         return convertToFileResponse(copied);
     }
@@ -269,6 +276,7 @@ public class FileServiceImpl implements FileService {
         FileEntity fileEntity = requireOwnedAvailableFile(fileId, currentUser);
         fileEntity.setIsPublic(Boolean.TRUE.equals(isPublic));
         FileEntity saved = fileRepository.save(fileEntity);
+        invalidateUserFileQueryCache(currentUser.getId());
         return convertToFileResponse(saved);
     }
     
@@ -388,25 +396,6 @@ public class FileServiceImpl implements FileService {
         return 50.0;
     }
     
-    // 移动端专用方法实现
-    
-    @Override
-    public FileUploadResponse uploadFile(MobileUploadRequest request, User uploader) {
-        if (request == null || request.getFile() == null || request.getFile().isEmpty()) {
-            throw new BusinessException("文件不能为空");
-        }
-
-        // 复用统一上传逻辑，确保移动端与网页端行为一致。
-        FileUploadResponse response = uploadFile(request.getFile(), request.getFolderId(), uploader);
-
-        // 移动端可选公开参数，上传成功后再更新公开状态。
-        if (Boolean.TRUE.equals(request.getIsPublic()) && response.getId() != null) {
-            setFilePublic(response.getId(), true, uploader);
-        }
-
-        return response;
-    }
-    
     @Override
     public List<FileSimpleResponse> getRecentFiles(User user, Integer limit) {
         int safeLimit = Math.max(limit == null ? 10 : limit, 1);
@@ -446,6 +435,7 @@ public class FileServiceImpl implements FileService {
             next.add(file.getId());
             return next;
         });
+        invalidateUserFileQueryCache(user.getId());
         log.info("收藏文件成功: userId={}, fileId={}", user.getId(), fileId);
     }
     
@@ -456,6 +446,7 @@ public class FileServiceImpl implements FileService {
             next.remove(fileId);
             return next;
         });
+        invalidateUserFileQueryCache(user.getId());
         log.info("取消收藏文件成功: userId={}, fileId={}", user.getId(), fileId);
     }
     
@@ -540,12 +531,8 @@ public class FileServiceImpl implements FileService {
                                               Folder targetFolder,
                                               User owner) {
         try {
-            Path sourcePath = resolvePhysicalFilePath(source);
             String newStorageName = UUID.randomUUID().toString();
-            Path uploadBase = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-            Files.createDirectories(uploadBase);
-            Path targetPath = uploadBase.resolve(newStorageName).normalize();
-            Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            fileStorageUtil.copyFile(source.getStorageName(), newStorageName, source.getFilePath());
 
             FileEntity copied = new FileEntity();
             copied.setOriginalName(copiedOriginalName);
@@ -591,13 +578,8 @@ public class FileServiceImpl implements FileService {
                                             User uploader,
                                             String md5Hash) {
         try {
-            Path sourcePath = resolvePhysicalFilePath(existingFile);
             String newStorageName = UUID.randomUUID().toString();
-            Path uploadBase = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-            Files.createDirectories(uploadBase);
-            Path targetPath = uploadBase.resolve(newStorageName).normalize();
-
-            Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            fileStorageUtil.copyFile(existingFile.getStorageName(), newStorageName, existingFile.getFilePath());
 
             String originalFilename = incomingFile.getOriginalFilename();
             FileEntity copied = new FileEntity();
@@ -622,30 +604,105 @@ public class FileServiceImpl implements FileService {
         }
     }
 
-    private Path resolvePhysicalFilePath(FileEntity fileEntity) {
-        Path uploadBase = Paths.get(fileStorageUtil.getUploadPath()).toAbsolutePath().normalize();
-        Path byStorageName = uploadBase.resolve(fileEntity.getStorageName()).normalize();
-        if (Files.exists(byStorageName)) {
-            return byStorageName;
+    private FileUploadResponse buildFastUploadResponse(FileEntity existingFile,
+                                                       MultipartFile incomingFile,
+                                                       Folder targetFolder,
+                                                       User uploader,
+                                                       String md5Hash) {
+        boolean sameOwner = existingFile.getUploader() != null
+                && existingFile.getUploader().getId().equals(uploader.getId());
+        boolean sameFolder = (existingFile.getFolder() == null && targetFolder == null)
+                || (existingFile.getFolder() != null && targetFolder != null
+                && existingFile.getFolder().getId().equals(targetFolder.getId()));
+
+        if (sameOwner && sameFolder) {
+            log.info("文件秒传成功（复用已有记录）：{} -> {}", incomingFile.getOriginalFilename(), existingFile.getStorageName());
+            return FileUploadResponse.builder()
+                    .id(existingFile.getId())
+                    .originalName(existingFile.getOriginalName())
+                    .storageName(existingFile.getStorageName())
+                    .fileSize(existingFile.getFileSize())
+                    .contentType(existingFile.getContentType())
+                    .downloadUrl("/api/files/" + existingFile.getId() + "/download")
+                    .previewUrl("/api/files/" + existingFile.getId() + "/preview")
+                    .isNewlyUploaded(false)
+                    .message("文件秒传成功")
+                    .build();
         }
 
-        String fallbackPath = fileEntity.getFilePath();
-        if (fallbackPath != null && !fallbackPath.isBlank()) {
-            String normalized = fallbackPath.replace("\\", "/");
-            if (normalized.startsWith("/")) {
-                normalized = normalized.substring(1);
-            }
-            if (normalized.startsWith("uploads/")) {
-                normalized = normalized.substring("uploads/".length());
-            }
+        FileEntity copiedMeta = createFastUploadCopy(existingFile, incomingFile, targetFolder, uploader, md5Hash);
+        long usedStorage = uploader.getUsedStorage() == null ? 0L : uploader.getUsedStorage();
+        uploader.setUsedStorage(usedStorage + copiedMeta.getFileSize());
+        invalidateUserFileQueryCache(uploader.getId());
 
-            Path byFilePath = uploadBase.resolve(normalized).normalize();
-            if (Files.exists(byFilePath)) {
-                return byFilePath;
-            }
+        log.info("文件秒传成功（创建当前用户副本）：{} -> {}", incomingFile.getOriginalFilename(), copiedMeta.getStorageName());
+        return FileUploadResponse.builder()
+                .id(copiedMeta.getId())
+                .originalName(copiedMeta.getOriginalName())
+                .storageName(copiedMeta.getStorageName())
+                .fileSize(copiedMeta.getFileSize())
+                .contentType(copiedMeta.getContentType())
+                .downloadUrl("/api/files/" + copiedMeta.getId() + "/download")
+                .previewUrl("/api/files/" + copiedMeta.getId() + "/preview")
+                .isNewlyUploaded(false)
+                .message("文件秒传成功")
+                .build();
+    }
+
+    private String buildUploadLockKey(Long userId, Long folderId, String md5Hash) {
+        long safeUserId = userId == null ? 0L : userId;
+        long safeFolderId = folderId == null ? 0L : folderId;
+        return safeUserId + ":" + safeFolderId + ":" + md5Hash;
+    }
+
+    private String buildUserQueryKey(User user, String fileName, int page, int size) {
+        long userId = user == null || user.getId() == null ? 0L : user.getId();
+        String keyword = fileName == null ? "" : fileName.trim();
+        return userId + "|" + keyword + "|" + Math.max(page, 0) + "|" + Math.max(size, 1);
+    }
+
+    private List<FileResponse> getCachedUserQueryResult(String queryKey) {
+        CacheEntry<List<FileResponse>> entry = userFileQueryCache.get(queryKey);
+        if (entry == null) {
+            return null;
+        }
+        if (entry.expired()) {
+            userFileQueryCache.remove(queryKey, entry);
+            return null;
+        }
+        return entry.value();
+    }
+
+    private void cacheUserQueryResult(String queryKey, List<FileResponse> result) {
+        long expireAt = System.currentTimeMillis() + USER_FILE_QUERY_CACHE_TTL_MILLIS;
+        userFileQueryCache.put(queryKey, new CacheEntry<>(new java.util.ArrayList<>(result), expireAt));
+    }
+
+    private void invalidateUserFileQueryCache(Long userId) {
+        if (userId == null) {
+            userFileQueryCache.clear();
+            return;
+        }
+        String prefix = userId + "|";
+        userFileQueryCache.keySet().removeIf(key -> key.startsWith(prefix));
+    }
+
+    private static final class CacheEntry<T> {
+        private final T value;
+        private final long expireAt;
+
+        private CacheEntry(T value, long expireAt) {
+            this.value = value;
+            this.expireAt = expireAt;
         }
 
-        throw new BusinessException("秒传源文件不存在，无法创建副本");
+        private T value() {
+            return value;
+        }
+
+        private boolean expired() {
+            return System.currentTimeMillis() > expireAt;
+        }
     }
     
     /**

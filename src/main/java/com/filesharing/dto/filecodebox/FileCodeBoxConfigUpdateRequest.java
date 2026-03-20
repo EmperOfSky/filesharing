@@ -6,7 +6,7 @@ import javax.validation.constraints.Min;
 import java.util.List;
 
 /**
- * FileCodeBox 兼容配置更新请求。
+ * 快传配置更新请求。
  * 所有字段均为可选，未传字段保持原值。
  */
 @Data

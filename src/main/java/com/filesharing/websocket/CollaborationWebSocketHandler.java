@@ -1,7 +1,10 @@
 package com.filesharing.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.filesharing.service.DocumentBlockService;
+import com.filesharing.service.RealTimeCollaborationService;
 import com.filesharing.entity.User;
+import com.filesharing.exception.BusinessException;
 import com.filesharing.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CollaborationWebSocketHandler extends TextWebSocketHandler {
     
     private final UserService userService;
+    private final DocumentBlockService documentBlockService;
+    private final RealTimeCollaborationService realTimeCollaborationService;
     private final ObjectMapper objectMapper;
     
     // 存储活跃的WebSocket会话
@@ -79,6 +84,18 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
                 case REQUEST_SYNC:
                     handleSyncRequest(session, collabMessage);
                     break;
+                case LOCK_BLOCK:
+                    handleLockBlock(session, collabMessage);
+                    break;
+                case UNLOCK_BLOCK:
+                    handleUnlockBlock(session, collabMessage);
+                    break;
+                case UPDATE_BLOCK:
+                    handleUpdateBlock(session, collabMessage);
+                    break;
+                case CREATE_BLOCK:
+                    handleCreateBlock(session, collabMessage);
+                    break;
                 default:
                     log.warn("未知的消息类型: {}", collabMessage.getType());
                     sendMessage(session, createErrorMessage("未知的消息类型"));
@@ -98,6 +115,11 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         // 清理用户文档映射
         String documentId = userDocumentMapping.remove(userId);
         if (documentId != null) {
+            try {
+                documentBlockService.unlockBlocksByUser(parseDocumentId(documentId), parseUserId(userId));
+            } catch (Exception ex) {
+                log.warn("连接断开时释放块锁失败: 用户ID={}, 文档ID={}", userId, documentId, ex);
+            }
             broadcastToDocument(documentId, createLeaveMessage(userId), session);
         }
         
@@ -119,11 +141,15 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         try {
             String userId = getUserIdFromSession(session);
             String documentId = message.getDocumentId();
+            User currentUser = requireCurrentUser(session);
             
             if (documentId == null || documentId.isEmpty()) {
                 sendMessage(session, createErrorMessage("文档ID不能为空"));
                 return;
             }
+
+            Long parsedDocumentId = parseDocumentId(documentId);
+            realTimeCollaborationService.joinCollaboration(parsedDocumentId, currentUser);
             
             // 更新用户文档映射
             String previousDocument = userDocumentMapping.put(userId, documentId);
@@ -133,10 +159,15 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
             }
             
             // 广播用户加入消息
-            broadcastToDocument(documentId, createJoinMessage(userId, message.getUserName()), session);
+            String displayName = message.getUserName() != null && !message.getUserName().isEmpty()
+                    ? message.getUserName()
+                    : currentUser.getUsername();
+            broadcastToDocument(documentId, createJoinMessage(userId, displayName), session);
             
-            // 发送文档当前状态
-            sendMessage(session, createDocumentStateMessage(documentId));
+            // 发送文档当前真实状态
+            RealTimeCollaborationService.DocumentState state =
+                    realTimeCollaborationService.syncDocumentState(parsedDocumentId, currentUser);
+            sendMessage(session, createDocumentStateMessage(parsedDocumentId, state));
             
             log.info("用户加入文档协作: 用户ID={}, 文档ID={}", userId, documentId);
             
@@ -150,8 +181,11 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         try {
             String userId = getUserIdFromSession(session);
             String documentId = userDocumentMapping.remove(userId);
+            User currentUser = requireCurrentUser(session);
             
             if (documentId != null) {
+                realTimeCollaborationService.leaveCollaboration(parseDocumentId(documentId), currentUser);
+                documentBlockService.unlockBlocksByUser(parseDocumentId(documentId), currentUser.getId());
                 broadcastToDocument(documentId, createLeaveMessage(userId), session);
                 log.info("用户离开文档协作: 用户ID={}, 文档ID={}", userId, documentId);
             }
@@ -165,15 +199,22 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         try {
             String userId = getUserIdFromSession(session);
             String documentId = userDocumentMapping.get(userId);
+            User currentUser = requireCurrentUser(session);
             
             if (documentId == null) {
                 sendMessage(session, createErrorMessage("用户未加入任何文档"));
                 return;
             }
             
-            // 转发编辑操作给其他协作者
-            CollaborationMessage forwardMessage = createEditOperationMessage(
-                userId, message.getUserName(), message.getOperation(), message.getPosition());
+            // 以实时服务中的最新状态广播，避免客户端再额外拉取一次。
+            Long parsedDocumentId = parseDocumentId(documentId);
+            RealTimeCollaborationService.DocumentState state =
+                    realTimeCollaborationService.syncDocumentState(parsedDocumentId, currentUser);
+            CollaborationMessage forwardMessage = createDocumentUpdatedMessage(
+                    parsedDocumentId,
+                    state,
+                    userId,
+                    message.getUserName() != null ? message.getUserName() : currentUser.getUsername());
             broadcastToDocument(documentId, forwardMessage, session);
             
             log.debug("转发编辑操作: 用户ID={}, 文档ID={}, 操作={}", 
@@ -231,14 +272,169 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         try {
             String userId = getUserIdFromSession(session);
             String documentId = userDocumentMapping.get(userId);
+            User currentUser = requireCurrentUser(session);
             
             if (documentId != null) {
-                sendMessage(session, createDocumentStateMessage(documentId));
+                Long parsedDocumentId = parseDocumentId(documentId);
+                RealTimeCollaborationService.DocumentState state =
+                        realTimeCollaborationService.syncDocumentState(parsedDocumentId, currentUser);
+                sendMessage(session, createDocumentStateMessage(parsedDocumentId, state));
             }
             
         } catch (Exception e) {
             log.error("处理同步请求失败", e);
         }
+    }
+
+    private void handleLockBlock(WebSocketSession session, CollaborationMessage message) {
+        try {
+            String userId = getUserIdFromSession(session);
+            String documentId = userDocumentMapping.get(userId);
+            User currentUser = requireCurrentUser(session);
+
+            if (documentId == null) {
+                sendMessage(session, createErrorMessage("用户未加入任何文档"));
+                return;
+            }
+            if (message.getBlockId() == null) {
+                sendMessage(session, createErrorMessage("缺少 blockId"));
+                return;
+            }
+
+            Long parsedDocumentId = parseDocumentId(documentId);
+            DocumentBlockService.BlockView block = documentBlockService.lockBlock(parsedDocumentId, message.getBlockId(), currentUser);
+            broadcastToDocument(documentId, createBlockMessage(MessageType.BLOCK_LOCKED, block, currentUser, null), null);
+        } catch (Exception e) {
+            log.error("处理 LOCK_BLOCK 失败", e);
+            sendMessage(session, createErrorMessage("锁定段落失败: " + e.getMessage()));
+        }
+    }
+
+    private void handleUnlockBlock(WebSocketSession session, CollaborationMessage message) {
+        try {
+            String userId = getUserIdFromSession(session);
+            String documentId = userDocumentMapping.get(userId);
+            User currentUser = requireCurrentUser(session);
+
+            if (documentId == null) {
+                sendMessage(session, createErrorMessage("用户未加入任何文档"));
+                return;
+            }
+            if (message.getBlockId() == null) {
+                sendMessage(session, createErrorMessage("缺少 blockId"));
+                return;
+            }
+
+            Long parsedDocumentId = parseDocumentId(documentId);
+            DocumentBlockService.BlockView block = documentBlockService.unlockBlock(parsedDocumentId, message.getBlockId(), currentUser);
+            broadcastToDocument(documentId, createBlockMessage(MessageType.BLOCK_UNLOCKED, block, currentUser, null), null);
+        } catch (Exception e) {
+            log.error("处理 UNLOCK_BLOCK 失败", e);
+            sendMessage(session, createErrorMessage("解锁段落失败: " + e.getMessage()));
+        }
+    }
+
+    private void handleUpdateBlock(WebSocketSession session, CollaborationMessage message) {
+        try {
+            String userId = getUserIdFromSession(session);
+            String documentId = userDocumentMapping.get(userId);
+            User currentUser = requireCurrentUser(session);
+
+            if (documentId == null) {
+                sendMessage(session, createErrorMessage("用户未加入任何文档"));
+                return;
+            }
+            if (message.getBlockId() == null) {
+                sendMessage(session, createErrorMessage("缺少 blockId"));
+                return;
+            }
+
+            Long parsedDocumentId = parseDocumentId(documentId);
+            DocumentBlockService.BlockView block = documentBlockService.updateBlock(
+                    parsedDocumentId,
+                    message.getBlockId(),
+                    message.getContent(),
+                    message.getVersion(),
+                    currentUser);
+            broadcastToDocument(documentId, createBlockMessage(MessageType.BLOCK_UPDATED, block, currentUser, null), null);
+        } catch (Exception e) {
+            log.error("处理 UPDATE_BLOCK 失败", e);
+            sendMessage(session, createErrorMessage("更新段落失败: " + e.getMessage()));
+        }
+    }
+
+    private void handleCreateBlock(WebSocketSession session, CollaborationMessage message) {
+        try {
+            String userId = getUserIdFromSession(session);
+            String documentId = userDocumentMapping.get(userId);
+            User currentUser = requireCurrentUser(session);
+
+            if (documentId == null) {
+                sendMessage(session, createErrorMessage("用户未加入任何文档"));
+                return;
+            }
+            if (message.getAfterBlockId() == null) {
+                sendMessage(session, createErrorMessage("缺少 afterBlockId"));
+                return;
+            }
+
+            Long parsedDocumentId = parseDocumentId(documentId);
+            DocumentBlockService.BlockView block = documentBlockService.createBlockAfter(
+                    parsedDocumentId,
+                    message.getAfterBlockId(),
+                    currentUser);
+            broadcastToDocument(
+                    documentId,
+                    createBlockMessage(MessageType.BLOCK_CREATED, block, currentUser, message.getAfterBlockId()),
+                    null);
+        } catch (Exception e) {
+            log.error("处理 CREATE_BLOCK 失败", e);
+            sendMessage(session, createErrorMessage("新增段落失败: " + e.getMessage()));
+        }
+    }
+
+    public void broadcastDocumentUpdated(
+            Long documentId,
+            RealTimeCollaborationService.DocumentState state,
+            String operatorUserId,
+            String operatorName) {
+        if (documentId == null || state == null) {
+            return;
+        }
+
+        CollaborationMessage message = createDocumentUpdatedMessage(documentId, state, operatorUserId, operatorName);
+        broadcastToDocument(String.valueOf(documentId), message, null);
+    }
+
+    public void broadcastBlockLocked(Long documentId, DocumentBlockService.BlockView block, User operator) {
+        if (documentId == null || block == null) {
+            return;
+        }
+        broadcastToDocument(String.valueOf(documentId), createBlockMessage(MessageType.BLOCK_LOCKED, block, operator, null), null);
+    }
+
+    public void broadcastBlockUnlocked(Long documentId, DocumentBlockService.BlockView block, User operator) {
+        if (documentId == null || block == null) {
+            return;
+        }
+        broadcastToDocument(String.valueOf(documentId), createBlockMessage(MessageType.BLOCK_UNLOCKED, block, operator, null), null);
+    }
+
+    public void broadcastBlockUpdated(Long documentId, DocumentBlockService.BlockView block, User operator) {
+        if (documentId == null || block == null) {
+            return;
+        }
+        broadcastToDocument(String.valueOf(documentId), createBlockMessage(MessageType.BLOCK_UPDATED, block, operator, null), null);
+    }
+
+    public void broadcastBlockCreated(Long documentId, Long afterBlockId, DocumentBlockService.BlockView block, User operator) {
+        if (documentId == null || block == null) {
+            return;
+        }
+        broadcastToDocument(
+                String.valueOf(documentId),
+                createBlockMessage(MessageType.BLOCK_CREATED, block, operator, afterBlockId),
+                null);
     }
     
     // ==================== 辅助方法 ====================
@@ -247,6 +443,34 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         // 从session属性中获取用户ID
         Object userIdObj = session.getAttributes().get("userId");
         return userIdObj != null ? userIdObj.toString() : null;
+    }
+
+    private Long parseDocumentId(String documentId) {
+        try {
+            return Long.parseLong(documentId);
+        } catch (NumberFormatException ex) {
+            throw new BusinessException("无效文档ID: " + documentId);
+        }
+    }
+
+    private Long parseUserId(String userId) {
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException ex) {
+            throw new BusinessException("无效用户ID: " + userId);
+        }
+    }
+
+    private User requireCurrentUser(WebSocketSession session) {
+        String userId = getUserIdFromSession(session);
+        if (userId == null || userId.isEmpty()) {
+            throw new BusinessException("WebSocket会话缺少用户信息");
+        }
+        try {
+            return userService.findUserById(Long.parseLong(userId));
+        } catch (NumberFormatException ex) {
+            throw new BusinessException("WebSocket会话用户ID无效: " + userId);
+        }
     }
     
     private void broadcastToDocument(String documentId, CollaborationMessage message, WebSocketSession excludeSession) {
@@ -348,13 +572,62 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         return message;
     }
     
-    private CollaborationMessage createDocumentStateMessage(String documentId) {
+    private CollaborationMessage createDocumentStateMessage(Long documentId, RealTimeCollaborationService.DocumentState state) {
         CollaborationMessage message = new CollaborationMessage();
         message.setType(MessageType.DOCUMENT_STATE);
-        message.setDocumentId(documentId);
-        message.setContent("{\"version\": 1, \"content\": \"文档初始内容\"}");
+        message.setDocumentId(String.valueOf(documentId));
+        message.setContent(serializeState(state));
         message.setTimestamp(System.currentTimeMillis());
         return message;
+    }
+
+    private CollaborationMessage createDocumentUpdatedMessage(
+            Long documentId,
+            RealTimeCollaborationService.DocumentState state,
+            String userId,
+            String userName) {
+        CollaborationMessage message = new CollaborationMessage();
+        message.setType(MessageType.DOCUMENT_UPDATED);
+        message.setDocumentId(String.valueOf(documentId));
+        message.setUserId(userId);
+        message.setUserName(userName);
+        message.setContent(serializeState(state));
+        message.setTimestamp(System.currentTimeMillis());
+        return message;
+    }
+
+    private String serializeState(RealTimeCollaborationService.DocumentState state) {
+        try {
+            return objectMapper.writeValueAsString(state);
+        } catch (Exception ex) {
+            throw new BusinessException("序列化文档状态失败");
+        }
+    }
+
+    private CollaborationMessage createBlockMessage(
+            MessageType type,
+            DocumentBlockService.BlockView block,
+            User operator,
+            Long afterBlockId) {
+        CollaborationMessage message = new CollaborationMessage();
+        message.setType(type);
+        message.setDocumentId(block.getDocumentId() == null ? null : String.valueOf(block.getDocumentId()));
+        message.setBlockId(block.getId());
+        message.setAfterBlockId(afterBlockId);
+        message.setVersion(block.getVersion());
+        message.setUserId(operator == null ? null : String.valueOf(operator.getId()));
+        message.setUserName(operator == null ? null : operator.getUsername());
+        message.setContent(serializeBlock(block));
+        message.setTimestamp(System.currentTimeMillis());
+        return message;
+    }
+
+    private String serializeBlock(DocumentBlockService.BlockView block) {
+        try {
+            return objectMapper.writeValueAsString(block);
+        } catch (Exception ex) {
+            throw new BusinessException("序列化文档块失败");
+        }
     }
     
     // ==================== 内部类 ====================
@@ -366,9 +639,18 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         CURSOR_POSITION,    // 光标位置
         CHAT_MESSAGE,       // 聊天消息
         REQUEST_SYNC,       // 请求同步
+        LOCK_BLOCK,         // 锁定段落（客户端动作）
+        UNLOCK_BLOCK,       // 解锁段落（客户端动作）
+        UPDATE_BLOCK,       // 更新段落（客户端动作）
+        CREATE_BLOCK,       // 新增段落（客户端动作）
         USER_JOIN,          // 用户加入
         USER_LEAVE,         // 用户离开
         DOCUMENT_STATE,     // 文档状态
+        DOCUMENT_UPDATED,   // 文档更新广播
+        BLOCK_LOCKED,       // 段落锁定广播
+        BLOCK_UNLOCKED,     // 段落解锁广播
+        BLOCK_UPDATED,      // 段落更新广播
+        BLOCK_CREATED,      // 段落创建广播
         SYSTEM,             // 系统消息
         ERROR               // 错误消息
     }
@@ -381,6 +663,9 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         private String content;
         private String operation; // insert, delete, update
         private Integer position;
+        private Long blockId;
+        private Long afterBlockId;
+        private Integer version;
         private String status; // success, error
         private Long timestamp;
         
@@ -405,6 +690,15 @@ public class CollaborationWebSocketHandler extends TextWebSocketHandler {
         
         public Integer getPosition() { return position; }
         public void setPosition(Integer position) { this.position = position; }
+
+        public Long getBlockId() { return blockId; }
+        public void setBlockId(Long blockId) { this.blockId = blockId; }
+
+        public Long getAfterBlockId() { return afterBlockId; }
+        public void setAfterBlockId(Long afterBlockId) { this.afterBlockId = afterBlockId; }
+
+        public Integer getVersion() { return version; }
+        public void setVersion(Integer version) { this.version = version; }
         
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }

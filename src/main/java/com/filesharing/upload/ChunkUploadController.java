@@ -4,6 +4,7 @@ import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
 import com.filesharing.repository.FileRepository;
 import com.filesharing.repository.UserRepository;
+import com.filesharing.util.FileStorageUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,9 +40,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ChunkUploadController {
 
-    @Value("${file.upload.path:./uploads/}")
-    private String storageBasePath;
-
     @Value("${file.upload.temp-path:./temp/}")
     private String tempBasePath;
 
@@ -57,6 +55,7 @@ public class ChunkUploadController {
 
     private final FileRepository fileRepository;
     private final UserRepository userRepository;
+    private final FileStorageUtil fileStorageUtil;
 
     /**
      * 初始化分片上传，返回 uploadId 和已存在分片索引（支持断点续传）
@@ -178,35 +177,38 @@ public class ChunkUploadController {
             return ResponseEntity.badRequest().body(Map.of("error", "uploadId not found"));
         }
 
-        // 生成唯一存储名
-        String storageName = UUID.randomUUID().toString();
-        Path storageDir = Paths.get(storageBasePath).toAbsolutePath().normalize();
-        Files.createDirectories(storageDir);
-        Path targetFile = storageDir.resolve(storageName);
-
-        try (OutputStream out = Files.newOutputStream(targetFile)) {
-            // 合并所有 part_*.part 文件按名称排序
-            Files.list(uploadDir)
+        List<Path> parts;
+        try (Stream<Path> stream = Files.list(uploadDir)) {
+            parts = stream
                     .filter(p -> p.getFileName().toString().startsWith("part_"))
                     .sorted()
-                    .forEach(part -> {
-                        try (InputStream in = Files.newInputStream(part)) {
-                            byte[] buffer = new byte[8192];
-                            int len;
-                            while ((len = in.read(buffer)) != -1) {
-                                out.write(buffer, 0, len);
-                            }
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
+                    .collect(Collectors.toList());
+        }
+        if (parts.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "no chunks uploaded"));
+        }
+
+        String storageName = UUID.randomUUID().toString();
+        Path mergedTempFile = Paths.get(tempBasePath).toAbsolutePath().normalize()
+                .resolve(uploadId + "_merged_" + UUID.randomUUID());
+
+        try (OutputStream out = Files.newOutputStream(mergedTempFile)) {
+            // 合并所有 part_*.part 文件按名称排序
+            for (Path part : parts) {
+                try (InputStream in = Files.newInputStream(part)) {
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, len);
+                    }
+                }
+            }
         }
 
         // 合并后校验总大小
-        long fileSize = Files.size(targetFile);
+        long fileSize = Files.size(mergedTempFile);
         if (fileSize > fileMaxSize) {
-            // 删除已合并文件并返回错误
-            try { Files.deleteIfExists(targetFile); } catch (IOException ignored) {}
+            try { Files.deleteIfExists(mergedTempFile); } catch (IOException ignored) {}
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "文件大小超出限制: " + fileMaxSize);
         }
 
@@ -215,7 +217,7 @@ public class ChunkUploadController {
             Set<String> allowed = Arrays.stream(allowedTypesCsv.split(","))
                     .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
             if (!allowed.isEmpty() && !allowed.contains(contentType)) {
-                try { Files.deleteIfExists(targetFile); } catch (IOException ignored) {}
+                try { Files.deleteIfExists(mergedTempFile); } catch (IOException ignored) {}
                 throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "不允许的文件类型: " + contentType);
             }
         }
@@ -223,9 +225,15 @@ public class ChunkUploadController {
         // 计算 SHA-256 返回给客户端，便于校验
         String sha256 = null;
         try {
-            sha256 = computeSHA256(targetFile);
+            sha256 = computeSHA256(mergedTempFile);
         } catch (IOException e) {
             log.warn("计算文件 sha256 失败", e);
+        }
+
+        try (InputStream mergedInput = Files.newInputStream(mergedTempFile)) {
+            fileStorageUtil.saveInputStreamAtPath(mergedInput, fileSize, storageName, contentType);
+        } finally {
+            try { Files.deleteIfExists(mergedTempFile); } catch (IOException ignored) {}
         }
 
         // 保存文件元数据，上传者为当前认证用户
@@ -261,7 +269,7 @@ public class ChunkUploadController {
 
         Map<String, String> resp = new HashMap<>();
         resp.put("storageName", storageName);
-        resp.put("filePath", targetFile.toString());
+        resp.put("filePath", "/uploads/" + storageName);
         resp.put("originalFilename", filename);
         resp.put("fileId", fe.getId() != null ? fe.getId().toString() : "");
         if (sha256 != null) resp.put("sha256", sha256);

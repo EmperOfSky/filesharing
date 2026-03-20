@@ -1,16 +1,21 @@
 package com.filesharing.service.impl;
 
+import com.filesharing.entity.CollaborativeDocument;
+import com.filesharing.entity.ProjectMember;
 import com.filesharing.entity.User;
 import com.filesharing.exception.BusinessException;
+import com.filesharing.repository.CollaborativeDocumentRepository;
+import com.filesharing.repository.ProjectMemberRepository;
 import com.filesharing.service.RealTimeCollaborationService;
 import com.filesharing.websocket.DocumentLockManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 实时协作服务实现类
@@ -21,6 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
 public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationService {
     
     private final DocumentLockManager documentLockManager;
+    private final CollaborativeDocumentRepository documentRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     
     // 存储文档状态
     private final Map<Long, DocumentState> documentStates = new ConcurrentHashMap<>();
@@ -30,9 +37,14 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
     
     // 存储编辑操作历史
     private final Map<Long, List<EditOperation>> editHistories = new ConcurrentHashMap<>();
-    
-    // 版本号生成器
-    private final AtomicLong versionGenerator = new AtomicLong(System.currentTimeMillis());
+
+    // 存储已应用操作（用于版本落后时进行patch重放）
+    private final Map<Long, List<AppliedOperationRecord>> operationHistories = new ConcurrentHashMap<>();
+
+    // 文档级操作锁，保证同一文档编辑串行化
+    private final Map<Long, Object> documentOperationLocks = new ConcurrentHashMap<>();
+
+    private static final int MAX_OPERATION_HISTORY = 500;
     
     @Override
     public CollaborationSession initializeCollaborationSession(Long documentId, User user) {
@@ -63,10 +75,8 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
     @Override
     public boolean joinCollaboration(Long documentId, User user) {
         try {
-            // 验证文档是否存在
-            if (!documentStates.containsKey(documentId)) {
-                throw new BusinessException("文档不存在");
-            }
+            // 如果会话尚未初始化，则按首次加入自动初始化。
+            documentStates.computeIfAbsent(documentId, this::createInitialDocumentState);
             
             // 添加协作者
             addCollaborator(documentId, user);
@@ -103,37 +113,106 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
         EditOperationResult result = new EditOperationResult();
         
         try {
+            if (operation == null || operation.getDocumentId() == null || operation.getType() == null) {
+                throw new BusinessException("编辑参数不完整");
+            }
+
             Long documentId = operation.getDocumentId();
             String userId = user.getId().toString();
-            
-            // 验证文档状态
-            DocumentState currentState = documentStates.get(documentId);
-            if (currentState == null) {
-                throw new BusinessException("文档状态不存在");
+
+            if (!canUserEditDocument(documentId, user)) {
+                throw new BusinessException("无权限编辑该文档");
             }
-            
-            // 检查版本冲突
-            if (operation.getVersion() != null && !operation.getVersion().equals(currentState.getVersion())) {
-                result.setSuccess(false);
-                result.setMessage("文档版本冲突，请先同步最新版本");
-                return result;
+
+            synchronized (getDocumentOperationLock(documentId)) {
+                // 验证文档状态
+                DocumentState currentState = documentStates.get(documentId);
+                if (currentState == null) {
+                    currentState = createInitialDocumentState(documentId);
+                    documentStates.put(documentId, currentState);
+                } else {
+                    // 有其他入口更新数据库时，优先以数据库最新状态为准。
+                    DocumentState latestState = loadDocumentStateFromDatabase(documentId);
+                    if (!Objects.equals(currentState.getVersion(), latestState.getVersion())
+                            || !Objects.equals(currentState.getContent(), latestState.getContent())) {
+                        currentState = latestState;
+                        documentStates.put(documentId, latestState);
+                    }
+                }
+
+                EditOperation normalizedOperation = normalizeOperation(operation);
+                normalizedOperation.setDocumentId(documentId);
+                normalizedOperation.setUserId(userId);
+                normalizedOperation.setTimestamp(
+                        operation.getTimestamp() != null ? operation.getTimestamp() : System.currentTimeMillis());
+
+                long clientVersion = normalizedOperation.getVersion() != null
+                        ? normalizedOperation.getVersion()
+                        : (currentState.getVersion() == null ? 0L : currentState.getVersion());
+                long serverVersion = currentState.getVersion() == null ? 0L : currentState.getVersion();
+
+                if (clientVersion > serverVersion) {
+                    result.setSuccess(false);
+                    result.setMessage("客户端版本超前，请先同步最新版本");
+                    return result;
+                }
+
+                List<ConflictResolution> autoResolvedConflicts = new ArrayList<>();
+
+                if (clientVersion < serverVersion) {
+                    List<AppliedOperationRecord> newerOperations = getOperationsAfterVersion(documentId, clientVersion);
+                    if (newerOperations.isEmpty()) {
+                        result.setSuccess(false);
+                        result.setMessage("文档版本冲突，请先同步最新版本");
+                        return result;
+                    }
+
+                    EditOperation rebasedOperation = rebaseOperation(normalizedOperation, newerOperations);
+                    autoResolvedConflicts.add(buildAutoResolvedConflict(
+                            normalizedOperation,
+                            rebasedOperation,
+                            clientVersion,
+                            serverVersion));
+                    normalizedOperation = rebasedOperation;
+                }
+
+                if (isNoOpOperation(normalizedOperation)) {
+                    updateCollaboratorActivity(documentId, userId);
+                    result.setSuccess(true);
+                    result.setMessage("编辑操作已自动合并，无需额外变更");
+                    result.setNewState(currentState);
+                    if (!autoResolvedConflicts.isEmpty()) {
+                        result.setConflicts(autoResolvedConflicts);
+                    }
+                    return result;
+                }
+
+                // 应用编辑操作
+                DocumentState newState = applyEditOperation(currentState, normalizedOperation);
+
+                // 更新文档状态
+                documentStates.put(documentId, newState);
+
+                // 持久化实时编辑结果，避免刷新后内容丢失
+                persistStateToDocument(documentId, newState, user);
+
+                // 记录编辑历史
+                editHistories.computeIfAbsent(documentId, k -> new CopyOnWriteArrayList<>())
+                        .add(copyOperation(normalizedOperation));
+                recordAppliedOperation(documentId, normalizedOperation, serverVersion, newState.getVersion());
+
+                // 更新协作者的最后活动时间
+                updateCollaboratorActivity(documentId, userId);
+
+                result.setSuccess(true);
+                result.setMessage(autoResolvedConflicts.isEmpty()
+                        ? "编辑操作成功"
+                        : "编辑操作成功，已执行patch级自动合并");
+                result.setNewState(newState);
+                if (!autoResolvedConflicts.isEmpty()) {
+                    result.setConflicts(autoResolvedConflicts);
+                }
             }
-            
-            // 应用编辑操作
-            DocumentState newState = applyEditOperation(currentState, operation);
-            
-            // 更新文档状态
-            documentStates.put(documentId, newState);
-            
-            // 记录编辑历史
-            editHistories.computeIfAbsent(documentId, k -> new ArrayList<>()).add(operation);
-            
-            // 更新协作者的最后活动时间
-            updateCollaboratorActivity(documentId, userId);
-            
-            result.setSuccess(true);
-            result.setMessage("编辑操作成功");
-            result.setNewState(newState);
             
             log.debug("处理编辑操作: 文档ID={}, 用户ID={}, 操作类型={}", 
                 documentId, userId, operation.getType());
@@ -150,9 +229,17 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
     @Override
     public DocumentState syncDocumentState(Long documentId, User user) {
         try {
-            DocumentState state = documentStates.get(documentId);
-            if (state == null) {
-                throw new BusinessException("文档状态不存在");
+            DocumentState cachedState = documentStates.get(documentId);
+            DocumentState latestState = loadDocumentStateFromDatabase(documentId);
+
+            DocumentState state;
+            if (cachedState == null
+                    || !Objects.equals(cachedState.getVersion(), latestState.getVersion())
+                    || !Objects.equals(cachedState.getContent(), latestState.getContent())) {
+                documentStates.put(documentId, latestState);
+                state = latestState;
+            } else {
+                state = cachedState;
             }
             
             // 更新协作者活动状态
@@ -262,13 +349,70 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
     // ==================== 私有辅助方法 ====================
     
     private DocumentState createInitialDocumentState(Long documentId) {
+        return loadDocumentStateFromDatabase(documentId);
+    }
+
+    private DocumentState loadDocumentStateFromDatabase(Long documentId) {
+        CollaborativeDocument document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException("文档不存在"));
+
         DocumentState state = new DocumentState();
         state.setDocumentId(documentId);
-        state.setContent(""); // 初始为空内容
-        state.setVersion(versionGenerator.incrementAndGet());
+        state.setContent(document.getContent() == null ? "" : document.getContent());
+        long currentVersion = document.getVersion() == null ? 1L : document.getVersion().longValue();
+        state.setVersion(currentVersion);
         state.setMetadata(new HashMap<>());
         state.setLastModified(System.currentTimeMillis());
         return state;
+    }
+
+    private void persistStateToDocument(Long documentId, DocumentState state, User user) {
+        CollaborativeDocument document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException("文档不存在"));
+
+        document.setContent(state.getContent());
+        document.setLastEditedBy(user);
+        document.setLastEditedAt(LocalDateTime.now());
+        long nextVersion = state.getVersion() == null
+                ? ((document.getVersion() == null ? 0L : document.getVersion().longValue()) + 1L)
+                : state.getVersion();
+        if (nextVersion > Integer.MAX_VALUE) {
+            throw new BusinessException("文档版本号超过上限");
+        }
+        document.setVersion((int) nextVersion);
+        documentRepository.save(document);
+    }
+
+    private boolean canUserEditDocument(Long documentId, User user) {
+        CollaborativeDocument document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException("文档不存在"));
+
+        if (user == null || document.getProject() == null) {
+            return false;
+        }
+
+        User owner = document.getProject().getOwner();
+        if (owner != null && Objects.equals(owner.getId(), user.getId())) {
+            return true;
+        }
+
+        boolean hasProjectEditRole = projectMemberRepository.findByProjectAndUser(document.getProject(), user)
+            .filter(member -> member.getStatus() == ProjectMember.MemberStatus.ACTIVE
+                && member.getInviteStatus() == ProjectMember.InviteStatus.ACCEPTED)
+            .map(member -> member.getRole() == ProjectMember.MemberRole.ADMIN
+                || member.getRole() == ProjectMember.MemberRole.MEMBER)
+            .orElse(false);
+
+        if (!hasProjectEditRole) {
+            return false;
+        }
+
+        if (!Boolean.TRUE.equals(document.getIsLocked())) {
+            return true;
+        }
+
+        return document.getLockedBy() != null
+            && Objects.equals(document.getLockedBy().getId(), user.getId());
     }
     
     private void addCollaborator(Long documentId, User user) {
@@ -297,36 +441,218 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
         
         documentLockManager.removeCollaborator(documentId.toString(), userId);
     }
+
+    private Object getDocumentOperationLock(Long documentId) {
+        return documentOperationLocks.computeIfAbsent(documentId, key -> new Object());
+    }
+
+    private EditOperation normalizeOperation(EditOperation operation) {
+        EditOperation normalized = copyOperation(operation);
+        normalized.setType(normalizeOperationType(operation.getType()));
+        normalized.setPosition(Math.max(operation.getPosition() == null ? 0 : operation.getPosition(), 0));
+        normalized.setLength(Math.max(operation.getLength() == null ? 0 : operation.getLength(), 0));
+        normalized.setContent(operation.getContent() == null ? "" : operation.getContent());
+        return normalized;
+    }
+
+    private String normalizeOperationType(String type) {
+        String normalizedType = type == null ? "" : type.trim().toLowerCase(Locale.ROOT);
+        if (!"insert".equals(normalizedType) && !"delete".equals(normalizedType) && !"update".equals(normalizedType)) {
+            throw new BusinessException("不支持的编辑操作类型: " + type);
+        }
+        return normalizedType;
+    }
+
+    private EditOperation copyOperation(EditOperation source) {
+        EditOperation copy = new EditOperation();
+        copy.setType(source.getType());
+        copy.setContent(source.getContent());
+        copy.setPosition(source.getPosition());
+        copy.setLength(source.getLength());
+        copy.setVersion(source.getVersion());
+        copy.setTimestamp(source.getTimestamp());
+        copy.setUserId(source.getUserId());
+        copy.setDocumentId(source.getDocumentId());
+        return copy;
+    }
+
+    private List<AppliedOperationRecord> getOperationsAfterVersion(Long documentId, long version) {
+        List<AppliedOperationRecord> history = operationHistories.get(documentId);
+        if (history == null || history.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<AppliedOperationRecord> result = new ArrayList<>();
+        for (AppliedOperationRecord record : history) {
+            if (record.getAppliedVersion() != null && record.getAppliedVersion() > version) {
+                result.add(record);
+            }
+        }
+        result.sort(Comparator.comparingLong(record -> record.getAppliedVersion() == null ? 0L : record.getAppliedVersion()));
+        return result;
+    }
+
+    private EditOperation rebaseOperation(EditOperation operation, List<AppliedOperationRecord> newerOperations) {
+        EditOperation rebased = copyOperation(operation);
+        for (AppliedOperationRecord appliedOperation : newerOperations) {
+            rebased = transformOperationByAppliedOperation(rebased, appliedOperation);
+        }
+        return normalizeOperation(rebased);
+    }
+
+    private EditOperation transformOperationByAppliedOperation(EditOperation incoming, AppliedOperationRecord applied) {
+        EditOperation transformed = copyOperation(incoming);
+
+        String incomingType = normalizeOperationType(transformed.getType());
+        int position = Math.max(transformed.getPosition() == null ? 0 : transformed.getPosition(), 0);
+        int length = Math.max(transformed.getLength() == null ? 0 : transformed.getLength(), 0);
+
+        if ("insert".equals(incomingType)) {
+            transformed.setPosition(transformIndex(position, applied, true));
+            return transformed;
+        }
+
+        int start = position;
+        int end = position + length;
+        int transformedStart = transformIndex(start, applied, false);
+        int transformedEnd = transformIndex(end, applied, true);
+        if (transformedEnd < transformedStart) {
+            transformedEnd = transformedStart;
+        }
+
+        transformed.setPosition(transformedStart);
+        transformed.setLength(transformedEnd - transformedStart);
+        return transformed;
+    }
+
+    private int transformIndex(int index, AppliedOperationRecord applied, boolean stickAfterInsert) {
+        int transformed = Math.max(index, 0);
+        int operationPosition = Math.max(applied.getPosition() == null ? 0 : applied.getPosition(), 0);
+        int deletedLength = getDeletedLength(applied);
+        int insertedLength = getInsertedLength(applied);
+
+        if (deletedLength > 0) {
+            int deleteEnd = operationPosition + deletedLength;
+            if (transformed > deleteEnd) {
+                transformed -= deletedLength;
+            } else if (transformed > operationPosition) {
+                transformed = operationPosition;
+            }
+        }
+
+        if (insertedLength > 0
+                && (transformed > operationPosition || (stickAfterInsert && transformed == operationPosition))) {
+            transformed += insertedLength;
+        }
+
+        return Math.max(transformed, 0);
+    }
+
+    private int getDeletedLength(AppliedOperationRecord record) {
+        String type = normalizeOperationType(record.getType());
+        if ("delete".equals(type) || "update".equals(type)) {
+            return Math.max(record.getLength() == null ? 0 : record.getLength(), 0);
+        }
+        return 0;
+    }
+
+    private int getInsertedLength(AppliedOperationRecord record) {
+        String type = normalizeOperationType(record.getType());
+        if ("insert".equals(type) || "update".equals(type)) {
+            return record.getContent() == null ? 0 : record.getContent().length();
+        }
+        return 0;
+    }
+
+    private boolean isNoOpOperation(EditOperation operation) {
+        String type = normalizeOperationType(operation.getType());
+        String content = operation.getContent() == null ? "" : operation.getContent();
+        int length = Math.max(operation.getLength() == null ? 0 : operation.getLength(), 0);
+
+        if ("insert".equals(type)) {
+            return content.isEmpty();
+        }
+        if ("delete".equals(type)) {
+            return length == 0;
+        }
+        return length == 0 && content.isEmpty();
+    }
+
+    private void recordAppliedOperation(
+            Long documentId,
+            EditOperation appliedOperation,
+            Long baseVersion,
+            Long appliedVersion) {
+        AppliedOperationRecord record = new AppliedOperationRecord();
+        record.setType(normalizeOperationType(appliedOperation.getType()));
+        record.setPosition(Math.max(appliedOperation.getPosition() == null ? 0 : appliedOperation.getPosition(), 0));
+        record.setLength(Math.max(appliedOperation.getLength() == null ? 0 : appliedOperation.getLength(), 0));
+        record.setContent(appliedOperation.getContent() == null ? "" : appliedOperation.getContent());
+        record.setBaseVersion(baseVersion);
+        record.setAppliedVersion(appliedVersion);
+
+        List<AppliedOperationRecord> history = operationHistories.computeIfAbsent(
+                documentId,
+                key -> new CopyOnWriteArrayList<>());
+        history.add(record);
+
+        int overflow = history.size() - MAX_OPERATION_HISTORY;
+        for (int i = 0; i < overflow; i++) {
+            history.remove(0);
+        }
+    }
+
+    private ConflictResolution buildAutoResolvedConflict(
+            EditOperation originalOperation,
+            EditOperation rebasedOperation,
+            long clientVersion,
+            long serverVersion) {
+        ConflictResolution conflict = new ConflictResolution();
+        conflict.setType("auto-resolved");
+        conflict.setDescription("检测到版本差异，已自动重放补丁并合并到最新文档");
+        conflict.setResolution(String.format(
+                Locale.ROOT,
+                "客户端版本 %d -> 服务端版本 %d，位置 %d -> %d，长度 %d -> %d",
+                clientVersion,
+                serverVersion,
+                Math.max(originalOperation.getPosition() == null ? 0 : originalOperation.getPosition(), 0),
+                Math.max(rebasedOperation.getPosition() == null ? 0 : rebasedOperation.getPosition(), 0),
+                Math.max(originalOperation.getLength() == null ? 0 : originalOperation.getLength(), 0),
+                Math.max(rebasedOperation.getLength() == null ? 0 : rebasedOperation.getLength(), 0)));
+        return conflict;
+    }
     
     private DocumentState applyEditOperation(DocumentState currentState, EditOperation operation) {
         DocumentState newState = new DocumentState();
         newState.setDocumentId(currentState.getDocumentId());
-        newState.setVersion(versionGenerator.incrementAndGet());
+        long nextVersion = (currentState.getVersion() == null ? 0L : currentState.getVersion()) + 1L;
+        newState.setVersion(nextVersion);
         newState.setMetadata(new HashMap<>(currentState.getMetadata()));
         newState.setLastModified(System.currentTimeMillis());
         
         String currentContent = currentState.getContent() != null ? currentState.getContent() : "";
         StringBuilder newContent = new StringBuilder(currentContent);
+        int safePosition = Math.max(0, Math.min(operation.getPosition() != null ? operation.getPosition() : 0, newContent.length()));
         
         switch (operation.getType().toLowerCase()) {
             case "insert":
-                if (operation.getPosition() != null && operation.getContent() != null) {
-                    newContent.insert(operation.getPosition(), operation.getContent());
+                if (operation.getContent() != null) {
+                    newContent.insert(safePosition, operation.getContent());
                 }
                 break;
                 
             case "delete":
                 if (operation.getPosition() != null && operation.getLength() != null) {
-                    int start = Math.min(operation.getPosition(), newContent.length());
-                    int end = Math.min(start + operation.getLength(), newContent.length());
+                    int start = safePosition;
+                    int end = Math.max(start, Math.min(start + Math.max(operation.getLength(), 0), newContent.length()));
                     newContent.delete(start, end);
                 }
                 break;
                 
             case "update":
                 if (operation.getPosition() != null && operation.getLength() != null && operation.getContent() != null) {
-                    int start = Math.min(operation.getPosition(), newContent.length());
-                    int end = Math.min(start + operation.getLength(), newContent.length());
+                    int start = safePosition;
+                    int end = Math.max(start, Math.min(start + Math.max(operation.getLength(), 0), newContent.length()));
                     newContent.replace(start, end, operation.getContent());
                 }
                 break;
@@ -347,6 +673,63 @@ public class RealTimeCollaborationServiceImpl implements RealTimeCollaborationSe
                 collaborator.setLastActiveTime(System.currentTimeMillis());
                 collaborator.setStatus("online");
             }
+        }
+    }
+
+    private static class AppliedOperationRecord {
+        private String type;
+        private Integer position;
+        private Integer length;
+        private String content;
+        private Long baseVersion;
+        private Long appliedVersion;
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public Integer getPosition() {
+            return position;
+        }
+
+        public void setPosition(Integer position) {
+            this.position = position;
+        }
+
+        public Integer getLength() {
+            return length;
+        }
+
+        public void setLength(Integer length) {
+            this.length = length;
+        }
+
+        public String getContent() {
+            return content;
+        }
+
+        public void setContent(String content) {
+            this.content = content;
+        }
+
+        public Long getBaseVersion() {
+            return baseVersion;
+        }
+
+        public void setBaseVersion(Long baseVersion) {
+            this.baseVersion = baseVersion;
+        }
+
+        public Long getAppliedVersion() {
+            return appliedVersion;
+        }
+
+        public void setAppliedVersion(Long appliedVersion) {
+            this.appliedVersion = appliedVersion;
         }
     }
 }

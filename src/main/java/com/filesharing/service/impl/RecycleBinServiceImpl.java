@@ -48,6 +48,11 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         if (file.getUploader() == null || !Objects.equals(file.getUploader().getId(), user.getId())) {
             throw new BusinessException("无权操作该文件");
         }
+        if (file.getStatus() == FileEntity.FileStatus.DELETED) {
+            throw new BusinessException("文件已在回收站中");
+        }
+
+        removeExistingRecycleRecords(file.getId(), RecycleBin.ItemType.FILE);
 
         LocalDateTime now = LocalDateTime.now();
         RecycleBin record = new RecycleBin();
@@ -81,6 +86,14 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         if (folder.getOwner() == null || !Objects.equals(folder.getOwner().getId(), user.getId())) {
             throw new BusinessException("无权操作该文件夹");
         }
+        if (folder.getChildren() != null && !folder.getChildren().isEmpty()) {
+            throw new BusinessException("请先删除子文件夹");
+        }
+        if (folder.getFiles() != null && !folder.getFiles().isEmpty()) {
+            throw new BusinessException("请先删除文件夹中的文件");
+        }
+
+        removeExistingRecycleRecords(folder.getId(), RecycleBin.ItemType.FOLDER);
 
         LocalDateTime now = LocalDateTime.now();
         RecycleBin record = new RecycleBin();
@@ -98,6 +111,7 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         record.setDeleteReason(deleteReason);
 
         recycleBinRepository.save(record);
+        folderRepository.delete(folder);
         log.info("文件夹移动到回收站：文件夹 ID={}, 删除者={}, 原因={}", folderId, user.getUsername(), deleteReason);
     }
     
@@ -145,35 +159,32 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     @Override
     public RestoreResult restoreItem(Long recycleBinId, User user) {
         RecycleBin record = getOwnedRecycleRecord(recycleBinId, user);
+        String itemType = record.getItemType() == null ? "UNKNOWN" : record.getItemType().name();
 
         if (!Boolean.TRUE.equals(record.getIsRecoverable())) {
             return new RestoreResult(false, "该项目不可恢复", recycleBinId,
-                    record.getItemType().name(), record.getOriginalPath());
+                    itemType, record.getOriginalPath());
         }
 
+        Long restoredItemId = record.getItemId();
+
         if (record.getItemType() == RecycleBin.ItemType.FILE) {
-            fileRepository.findById(record.getItemId()).ifPresent(file -> {
-                file.setStatus(FileEntity.FileStatus.AVAILABLE);
-                file.setDeletedAt(null);
-                if (record.getOriginalParentId() != null) {
-                    folderRepository.findById(record.getOriginalParentId()).ifPresent(file::setFolder);
-                }
-                fileRepository.save(file);
-            });
+            FileEntity file = fileRepository.findById(record.getItemId())
+                    .orElseThrow(() -> new BusinessException("源文件不存在，无法恢复"));
+            file.setStatus(FileEntity.FileStatus.AVAILABLE);
+            file.setDeletedAt(null);
+            if (record.getOriginalParentId() != null) {
+                folderRepository.findById(record.getOriginalParentId()).ifPresent(file::setFolder);
+            }
+            fileRepository.save(file);
         } else {
-            folderRepository.findById(record.getItemId()).ifPresent(folder -> {
-                if (record.getOriginalParentId() == null) {
-                    folder.setParent(null);
-                } else {
-                    folderRepository.findById(record.getOriginalParentId()).ifPresent(folder::setParent);
-                }
-                folderRepository.save(folder);
-            });
+            Folder restoredFolder = restoreOrRecreateFolder(record, null, user);
+            restoredItemId = restoredFolder.getId();
         }
 
         recycleBinRepository.delete(record);
         log.info("恢复回收站项目：ID={}, 用户={}", recycleBinId, user.getUsername());
-        return new RestoreResult(true, "恢复成功", record.getItemId(), record.getItemType().name(), record.getOriginalPath());
+        return new RestoreResult(true, "恢复成功", restoredItemId, itemType, record.getOriginalPath());
     }
         
     @Override
@@ -186,6 +197,9 @@ public class RecycleBinServiceImpl implements RecycleBinService {
             throw new BusinessException("无权恢复到该目标文件夹");
         }
 
+        String itemType = record.getItemType() == null ? "UNKNOWN" : record.getItemType().name();
+        Long restoredItemId = record.getItemId();
+
         if (record.getItemType() == RecycleBin.ItemType.FILE) {
             FileEntity file = fileRepository.findById(record.getItemId())
                     .orElseThrow(() -> new BusinessException("源文件不存在"));
@@ -194,16 +208,14 @@ public class RecycleBinServiceImpl implements RecycleBinService {
             file.setFolder(targetFolder);
             fileRepository.save(file);
         } else {
-            Folder folder = folderRepository.findById(record.getItemId())
-                    .orElseThrow(() -> new BusinessException("源文件夹不存在"));
-            folder.setParent(targetFolder);
-            folderRepository.save(folder);
+            Folder restoredFolder = restoreOrRecreateFolder(record, targetFolder, user);
+            restoredItemId = restoredFolder.getId();
         }
 
         recycleBinRepository.delete(record);
         String restorePath = targetFolder.getFolderPath() == null ? targetFolder.getName() : targetFolder.getFolderPath();
         log.info("恢复到指定位置：回收站 ID={}, 目标文件夹 ID={}, 用户={}", recycleBinId, targetFolderId, user.getUsername());
-        return new RestoreResult(true, "恢复成功", record.getItemId(), record.getItemType().name(), restorePath);
+        return new RestoreResult(true, "恢复成功", restoredItemId, itemType, restorePath);
     }
     
     @Override
@@ -412,6 +424,57 @@ public class RecycleBinServiceImpl implements RecycleBinService {
             return ((Number) value).longValue();
         }
         return Long.parseLong(value.toString());
+    }
+
+    private void removeExistingRecycleRecords(Long itemId, RecycleBin.ItemType itemType) {
+        List<RecycleBin> existing = recycleBinRepository.findByItemIdAndItemType(itemId, itemType);
+        if (!existing.isEmpty()) {
+            recycleBinRepository.deleteAll(existing);
+        }
+    }
+
+    private Folder restoreOrRecreateFolder(RecycleBin record, Folder targetParent, User user) {
+        Folder folder = folderRepository.findById(record.getItemId()).orElseGet(() -> {
+            Folder recreated = new Folder();
+            recreated.setOwner(user);
+            recreated.setDescription("从回收站恢复");
+            recreated.setIsPublic(false);
+            return recreated;
+        });
+
+        Folder parent = targetParent;
+        if (parent == null && record.getOriginalParentId() != null) {
+            parent = folderRepository.findById(record.getOriginalParentId()).orElse(null);
+        }
+
+        String baseName = (record.getOriginalName() == null || record.getOriginalName().isBlank())
+                ? "恢复文件夹"
+                : record.getOriginalName().trim();
+        String recoveredName = generateRecoveredFolderName(user, parent, baseName, folder.getId());
+
+        folder.setName(recoveredName);
+        folder.setParent(parent);
+        folder.setFolderPath(buildFolderPath(parent, recoveredName));
+        return folderRepository.save(folder);
+    }
+
+    private String generateRecoveredFolderName(User owner, Folder parent, String baseName, Long currentFolderId) {
+        String candidate = baseName;
+        int suffix = 1;
+        while (true) {
+            Folder existing = folderRepository.findByOwnerAndNameAndParent(owner, candidate, parent).orElse(null);
+            if (existing == null || (currentFolderId != null && Objects.equals(existing.getId(), currentFolderId))) {
+                return candidate;
+            }
+            suffix++;
+            candidate = baseName + "(恢复" + suffix + ")";
+        }
+    }
+
+    private String buildFolderPath(Folder parent, String folderName) {
+        String parentPath = parent == null ? "" : (parent.getFolderPath() == null ? "" : parent.getFolderPath());
+        String separator = parentPath.isEmpty() || parentPath.endsWith("/") ? "" : "/";
+        return (parentPath + separator + "/" + folderName).replace("//", "/");
     }
 
 }

@@ -1,0 +1,101 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: filesharing-mysql
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: filesharing
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./setup_mysql.sql:/docker-entrypoint-initdb.d/01-setup.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: filesharing-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: filesharing-minio-init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BUCKET: filesharing
+    volumes:
+      - ./docker/minio/minio-init.sh:/init/minio-init.sh:ro
+    entrypoint: ["/bin/sh", "/init/minio-init.sh"]
+    restart: "no"
+
+  backend:
+    container_name: filesharing-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      HTTPS_ENABLED: "false"
+      HTTPS_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/filesharing?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+      STORAGE_TYPE: minio
+      STORAGE_MINIO_ENDPOINT: http://minio:9000
+      STORAGE_MINIO_ACCESS_KEY: minioadmin
+      STORAGE_MINIO_SECRET_KEY: minioadmin
+      STORAGE_MINIO_BUCKET: filesharing
+      STORAGE_MINIO_BASE_PATH: app
+      FILE_UPLOAD_PATH: /app/uploads/
+      FILE_UPLOAD_TEMP_PATH: /app/temp/
+      BACKUP_BASE_PATH: /app/backups
+    ports:
+      - "8080:8080"
+    volumes:
+      - app-uploads:/app/uploads
+      - app-temp:/app/temp
+      - ./backups:/app/backups
+    restart: unless-stopped
+
+  frontend:
+    container_name: filesharing-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  minio-data:
+  app-uploads:
+  app-temp:

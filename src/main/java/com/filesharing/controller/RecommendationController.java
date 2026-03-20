@@ -63,14 +63,21 @@ public class RecommendationController {
             HttpServletRequest request) {
         try {
             User currentUser = userService.getCurrentUser(request);
-            Page<SmartRecommendation> recommendations = recommendationService.getUserRecommendations(currentUser, page, size);
+            int safePage = Math.max(page, 0);
+            int safeSize = Math.max(size, 1);
+            Page<SmartRecommendation> recommendations = recommendationService.getUserRecommendations(currentUser, safePage, safeSize);
             
             Map<String, Object> result = new HashMap<>();
+            result.put("content", recommendations.getContent());
             result.put("recommendations", recommendations.getContent());
+            result.put("number", recommendations.getNumber());
             result.put("currentPage", recommendations.getNumber());
             result.put("totalPages", recommendations.getTotalPages());
             result.put("totalElements", recommendations.getTotalElements());
+            result.put("numberOfElements", recommendations.getNumberOfElements());
             result.put("size", recommendations.getSize());
+            result.put("first", recommendations.isFirst());
+            result.put("last", recommendations.isLast());
             
             return ResponseEntity.ok(ApiResponse.success("获取推荐列表成功", result));
             

@@ -161,6 +161,8 @@ public class CloudStorageConfig {
         TENCENT_COS,    // 腾讯云COS
         QINIU_KODO,     // 七牛云Kodo
         MINIO,          // MinIO
+        ONE_DRIVE,      // OneDrive
+        OPENDAL,        // OpenDAL
         LOCAL           // 本地存储
     }
     

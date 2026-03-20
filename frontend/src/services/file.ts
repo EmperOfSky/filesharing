@@ -1,5 +1,16 @@
 import http from './http'
-import { FileItem, Folder, PaginatedResponse, SearchRequest, SearchResponse } from '@/types'
+import {
+  BatchOperationResult,
+  ExpiringRecycleItem,
+  FileItem,
+  Folder,
+  PaginatedResponse,
+  RecycleBinItem,
+  RecycleBinStats,
+  RestoreResult,
+  SearchRequest,
+  SearchResponse
+} from '@/types'
 
 class FileService {
   async uploadFile(file: File, folderId?: number): Promise<FileItem> {
@@ -49,6 +60,63 @@ class FileService {
 
   async deleteFolder(id: number): Promise<void> {
     return http.delete(`/folders/${id}`)
+  }
+
+  // 回收站相关
+  async moveFileToRecycleBin(id: number, deleteReason?: string): Promise<string> {
+    return http.post<string>(`/recycle-bin/files/${id}`, { deleteReason })
+  }
+
+  async moveFolderToRecycleBin(id: number, deleteReason?: string): Promise<string> {
+    return http.post<string>(`/recycle-bin/folders/${id}`, { deleteReason })
+  }
+
+  async getRecycleBin(page = 0, size = 20, itemType?: string): Promise<PaginatedResponse<RecycleBinItem>> {
+    const params: Record<string, any> = { page, size }
+    if (itemType && itemType !== 'ALL') {
+      params.itemType = itemType
+    }
+    return http.get<PaginatedResponse<RecycleBinItem>>('/recycle-bin', { params })
+  }
+
+  async searchRecycleBin(keyword: string, page = 0, size = 20): Promise<PaginatedResponse<RecycleBinItem>> {
+    return http.get<PaginatedResponse<RecycleBinItem>>('/recycle-bin/search', {
+      params: { keyword, page, size }
+    })
+  }
+
+  async restoreRecycleBinItem(recycleBinId: number): Promise<RestoreResult> {
+    return http.post<RestoreResult>(`/recycle-bin/${recycleBinId}/restore`, {})
+  }
+
+  async restoreRecycleBinItemToFolder(recycleBinId: number, targetFolderId: number): Promise<RestoreResult> {
+    return http.post<RestoreResult>(`/recycle-bin/${recycleBinId}/restore-to`, { targetFolderId })
+  }
+
+  async permanentlyDeleteRecycleBinItem(recycleBinId: number): Promise<string> {
+    return http.delete<string>(`/recycle-bin/${recycleBinId}`)
+  }
+
+  async emptyRecycleBin(): Promise<string> {
+    return http.delete<string>('/recycle-bin/empty')
+  }
+
+  async getRecycleBinStats(): Promise<RecycleBinStats> {
+    return http.get<RecycleBinStats>('/recycle-bin/stats')
+  }
+
+  async getRecycleBinExpiring(hours = 24): Promise<ExpiringRecycleItem[]> {
+    return http.get<ExpiringRecycleItem[]>('/recycle-bin/expiring', {
+      params: { hours }
+    })
+  }
+
+  async batchRestoreRecycleBinItems(recycleBinIds: number[]): Promise<BatchOperationResult> {
+    return http.post<BatchOperationResult>('/recycle-bin/batch/restore', { recycleBinIds })
+  }
+
+  async batchDeleteRecycleBinItems(recycleBinIds: number[]): Promise<BatchOperationResult> {
+    return http.post<BatchOperationResult>('/recycle-bin/batch/delete', { recycleBinIds })
   }
 }
 

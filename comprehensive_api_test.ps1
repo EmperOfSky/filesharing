@@ -119,57 +119,9 @@ try {
 }
 
 # ============================================================
-# 4. 测试AI接口 (AI Service Tests)
+# 4. 测试文件接口 (File Management Tests)
 # ============================================================
-Write-Title "Step 4: 测试AI服务接口 (AI Endpoints)"
-
-$aiTests = @(
-    @{ method = "GET"; path = "/api/ai/models"; name = "获取AI模型列表"; payload = $null }
-    @{ method = "POST"; path = "/api/ai/summary"; name = "文档摘要"; payload = @{ content = "这是一个测试文本用来生成摘要"; ratio = 0.5 } }
-    @{ method = "POST"; path = "/api/ai/qa"; name = "问答系统"; payload = @{ context = "背景信息"; question = "问题内容" } }
-    @{ method = "POST"; path = "/api/ai/correct"; name = "文本纠正"; payload = @{ text = "这是一个有错别字的文本" } }
-    @{ method = "POST"; path = "/api/ai/classify"; name = "内容分类"; payload = @{ content = "这是需要分类的内容" } }
-    @{ method = "POST"; path = "/api/ai/smart-search"; name = "智能搜索"; payload = @{ query = "搜索查询"; context = "搜索上下文" } }
-    @{ method = "POST"; path = "/api/ai/sentiment"; name = "情感分析"; payload = @{ text = "我很高兴今天天气真好" } }
-    @{ method = "POST"; path = "/api/ai/keywords"; name = "关键词提取"; payload = @{ text = "这是一个包含很多关键信息的文本内容" } }
-)
-
-$aiPassed = 0
-$aiFailed = 0
-
-foreach ($test in $aiTests) {
-    try {
-        if ($test.method -eq "GET") {
-            $resp = Invoke-RestMethod -Uri "$baseUrl$($test.path)" `
-                -Method GET `
-                -TimeoutSec 5 -ErrorAction Stop
-        } else {
-            $payloadJson = $test.payload | ConvertTo-Json
-            $resp = Invoke-RestMethod -Uri "$baseUrl$($test.path)" `
-                -Method POST `
-                -ContentType "application/json" `
-                -Body $payloadJson `
-                -TimeoutSec 5 -ErrorAction Stop
-        }
-        Write-OK "$($test.name) - $($test.path)"
-        $aiPassed++
-        $results.Passed++
-    } catch {
-        $statusCode = $_.Exception.Response.StatusCode
-        if ($statusCode -eq 400 -or $statusCode -eq 405) {
-            Write-Warn "$($test.name) - 端点存在但需要正确参数 (HTTP $statusCode)"
-        } else {
-            Write-Err "$($test.name) - 失败 (HTTP $statusCode)"
-            $results.Failed++
-            $results.Errors += "AI接口: $($test.path)"
-        }
-    }
-}
-
-# ============================================================
-# 5. 测试文件接口 (File Management Tests)
-# ============================================================
-Write-Title "Step 5: 测试文件管理接口 (File Endpoints)"
+Write-Title "Step 4: 测试文件管理接口 (File Endpoints)"
 
 if (-not $script:token) {
     Write-Warn "无authentication token, 跳过需要认证的文件测试"
@@ -224,9 +176,9 @@ if (-not $script:token) {
 }
 
 # ============================================================
-# 6. 测试用户接口 (User Management Tests)
+# 5. 测试用户接口 (User Management Tests)
 # ============================================================
-Write-Title "Step 6: 测试用户管理接口 (User Endpoints)"
+Write-Title "Step 5: 测试用户管理接口 (User Endpoints)"
 
 if (-not $script:token) {
     Write-Warn "无authentication token, 跳过需要认证的用户测试"
@@ -270,7 +222,7 @@ if (-not $script:token) {
 }
 
 # ============================================================
-# 7. 结果汇总
+# 6. 结果汇总
 # ============================================================
 Write-Title "测试结果总结 (Test Summary)"
 

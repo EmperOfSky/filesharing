@@ -36,6 +36,8 @@ public interface CollaborationService {
     CollaborativeDocumentResponse lockDocument(Long documentId, User currentUser);
     CollaborativeDocumentResponse unlockDocument(Long documentId, User currentUser);
     boolean isDocumentLocked(Long documentId);
+    Page<CollaborativeDocumentSnapshotResponse> getDocumentSnapshots(Long documentId, Pageable pageable, User currentUser);
+    CollaborativeDocumentResponse restoreDocumentSnapshot(Long documentId, Long snapshotId, User currentUser);
     
     // 评论相关方法
     CommentResponse addComment(Long documentId, CommentCreateRequest request, User currentUser);

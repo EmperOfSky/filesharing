@@ -1,8 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import QRCode from 'qrcode'
+import { UploadFilled, Document, Clock, Connection, Check, CopyDocument, TopRight } from '@element-plus/icons-vue'
 import fileCodeBoxService, {
   type FileCodeBoxSelectResult,
   type FileCodeBoxShareResult
@@ -26,11 +27,13 @@ interface PickupHistoryItem {
 }
 
 const route = useRoute()
+const router = useRouter()
 
 const SEND_HISTORY_KEY = 'fcb_send_history'
 const PICKUP_HISTORY_KEY = 'fcb_pickup_history'
+const PICKUP_CODE_LENGTH = 32
 
-const activeTab = ref('text')
+const activeTab = ref<'text' | 'file' | 'presign' | 'select'>('text')
 
 const sharing = ref(false)
 const selecting = ref(false)
@@ -96,7 +99,7 @@ const pushSendHistory = (result: FileCodeBoxShareResult, kind: SendHistoryItem['
     kind,
     createdAt: new Date().toISOString()
   }
-  sendHistories.value = [item, ...sendHistories.value.filter((x) => x.code !== item.code)]
+  sendHistories.value = [item, ...sendHistories.value.filter((entry) => entry.code !== item.code)]
   saveSendHistories()
 }
 
@@ -109,7 +112,7 @@ const pushPickupHistory = (code: string, detail: FileCodeBoxSelectResult) => {
     createdAt: new Date().toISOString(),
     isFile: typeof detail.text === 'string' && detail.text.startsWith('/api/public/share/download')
   }
-  pickupHistories.value = [item, ...pickupHistories.value.filter((x) => x.code !== item.code)]
+  pickupHistories.value = [item, ...pickupHistories.value.filter((entry) => entry.code !== item.code)]
   savePickupHistories()
 }
 
@@ -128,8 +131,15 @@ const fillPickupCode = (code: string) => {
   activeTab.value = 'select'
 }
 
+const goPickupSpace = (code: string) => {
+  router.push({
+    path: '/dashboard/pickup-space',
+    query: { code }
+  })
+}
+
 const buildPickupUrl = (code: string) => {
-  const basePath = `${window.location.origin}${route.path}`
+  const basePath = `${window.location.origin}/dashboard/pickup-space`
   return `${basePath}?code=${encodeURIComponent(code)}`
 }
 
@@ -137,6 +147,44 @@ const qrLink = computed(() => {
   if (!qrCodeTarget.value) return ''
   return buildPickupUrl(qrCodeTarget.value)
 })
+
+const sendCount = computed(() => sendHistories.value.length)
+const pickupCount = computed(() => pickupHistories.value.length)
+const modeLabel = computed(() => {
+  const labels: Record<typeof activeTab.value, string> = {
+    text: '文本快传',
+    file: '文件快传',
+    presign: '直传上传',
+    select: '取件验证'
+  }
+  return labels[activeTab.value]
+})
+const selectedTextPreview = computed(() => {
+  if (!selected.value || selectedIsDownload.value) return ''
+  const text = selected.value.text || ''
+  return text.length > 1000 ? `${text.slice(0, 1000)}...` : text
+})
+
+const sendPreviewList = computed(() => sendHistories.value.slice(0, 4))
+const pickupPreviewList = computed(() => pickupHistories.value.slice(0, 4))
+
+const formatSize = (size: number) => {
+  if (size <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let index = 0
+  let value = size
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024
+    index += 1
+  }
+  return `${value.toFixed(index === 0 ? 0 : 2)} ${units[index]}`
+}
+
+const formatDateTime = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
 
 const copyText = async (text: string, successText: string) => {
   try {
@@ -158,7 +206,11 @@ const openQrDialog = async (code: string) => {
     qrLoading.value = true
     qrImageData.value = await QRCode.toDataURL(buildPickupUrl(code), {
       margin: 2,
-      width: 320
+      width: 320,
+      color: {
+        dark: '#334155',
+        light: '#ffffff'
+      }
     })
   } catch {
     ElMessage.error('二维码生成失败')
@@ -167,17 +219,12 @@ const openQrDialog = async (code: string) => {
   }
 }
 
-const formatDateTime = (value: string) => {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleString()
-}
-
 const onTextShare = async () => {
   if (!textContent.value.trim()) {
-    ElMessage.warning('请输入文本内容')
+    ElMessage.warning('请输入要发送的文本')
     return
   }
+
   try {
     sharing.value = true
     lastShareResult.value = await fileCodeBoxService.shareText(
@@ -186,17 +233,17 @@ const onTextShare = async () => {
       textExpireStyle.value
     )
     pushSendHistory(lastShareResult.value, 'text')
-    ElMessage.success(`文本分享成功，取件码：${lastShareResult.value.code}`)
+    ElMessage.success(`快传已创建，取件码：${lastShareResult.value.code}`)
   } catch (error: any) {
-    const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '文本分享失败'
+    const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '文本快传失败'
     ElMessage.error(message)
   } finally {
     sharing.value = false
   }
 }
 
-const onFilePicked = (evt: Event) => {
-  const input = evt.target as HTMLInputElement
+const onFilePicked = (event: Event) => {
+  const input = event.target as HTMLInputElement
   fileToShare.value = input.files?.[0] || null
 }
 
@@ -214,9 +261,9 @@ const onFileShare = async () => {
       fileExpireStyle.value
     )
     pushSendHistory(lastShareResult.value, 'file')
-    ElMessage.success(`文件分享成功，取件码：${lastShareResult.value.code}`)
+    ElMessage.success(`快传已创建，取件码：${lastShareResult.value.code}`)
   } catch (error: any) {
-    const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '文件分享失败'
+    const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '文件快传失败'
     ElMessage.error(message)
   } finally {
     sharing.value = false
@@ -224,17 +271,22 @@ const onFileShare = async () => {
 }
 
 const onSelectByCode = async () => {
-  if (!pickupCode.value.trim()) {
+  const code = pickupCode.value.trim()
+  if (!code) {
     ElMessage.warning('请输入取件码')
+    return
+  }
+  if (code.length !== PICKUP_CODE_LENGTH) {
+    ElMessage.warning(`取件码必须为 ${PICKUP_CODE_LENGTH} 位`)
     return
   }
 
   try {
     selecting.value = true
-    const detail = await fileCodeBoxService.selectByCode(pickupCode.value.trim())
+    const detail = await fileCodeBoxService.selectByCode(code)
     selected.value = detail
     selectedIsDownload.value = typeof detail.text === 'string' && detail.text.startsWith('/api/public/share/download')
-    pushPickupHistory(pickupCode.value.trim(), detail)
+    pushPickupHistory(code, detail)
     ElMessage.success('取件成功')
   } catch (error: any) {
     const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '取件失败'
@@ -245,25 +297,22 @@ const onSelectByCode = async () => {
 }
 
 const downloadSelectedFile = () => {
-  if (!selected.value || !selectedIsDownload.value) {
-    return
-  }
-  const absoluteUrl = `${window.location.origin}${selected.value.text}`
-  window.open(absoluteUrl, '_blank')
+  if (!selected.value || !selectedIsDownload.value) return
+  window.open(`${window.location.origin}${selected.value.text}`, '_blank')
 }
 
-const onPresignFilePicked = (evt: Event) => {
-  const input = evt.target as HTMLInputElement
+const onPresignFilePicked = (event: Event) => {
+  const input = event.target as HTMLInputElement
   presignFile.value = input.files?.[0] || null
 }
 
 const uploadByDirectUrl = async (uploadUrl: string, file: File) => {
-  const resp = await fetch(uploadUrl, {
+  const response = await fetch(uploadUrl, {
     method: 'PUT',
     body: file
   })
-  if (!resp.ok) {
-    throw new Error(`直传失败: ${resp.status}`)
+  if (!response.ok) {
+    throw new Error(`直传失败：${response.status}`)
   }
 }
 
@@ -297,10 +346,9 @@ const onPresignUpload = async () => {
     }
 
     pushSendHistory(lastShareResult.value, 'presign')
-
-    ElMessage.success(`预签名上传完成，取件码：${lastShareResult.value.code}`)
+    ElMessage.success(`直传已完成，取件码：${lastShareResult.value.code}`)
   } catch (error: any) {
-    const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '预签名上传失败'
+    const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '直传上传失败'
     ElMessage.error(message)
   } finally {
     presignUploading.value = false
@@ -317,298 +365,815 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="fcb-share-page">
-    <el-card shadow="never">
-      <template #header>
-        <div class="header-row">
-          <div class="card-title">FileCodeBox 兼容分享</div>
-          <el-space>
-            <el-button size="small" @click="sendHistoryVisible = true">发件记录</el-button>
-            <el-button size="small" @click="pickupHistoryVisible = true">取件记录</el-button>
-          </el-space>
+  <div class="page-container">
+    <!-- Header Hero Section -->
+    <header class="page-header">
+      <div class="header-content">
+        <h1 class="title">快传工作台</h1>
+        <p class="subtitle">Quick Transfer — 高效流转您的文件与文本信息</p>
+      </div>
+      <div class="header-stats">
+        <div class="stat-item">
+          <span class="stat-label">当前模式</span>
+          <span class="stat-value primary">{{ modeLabel }}</span>
         </div>
-      </template>
-
-      <el-tabs v-model="activeTab">
-        <el-tab-pane label="文本分享" name="text">
-          <el-form label-width="120px">
-            <el-form-item label="文本内容">
-              <el-input v-model="textContent" type="textarea" :rows="5" maxlength="220000" show-word-limit />
-            </el-form-item>
-            <el-form-item label="过期策略">
-              <el-select v-model="textExpireStyle" style="width: 180px">
-                <el-option v-for="s in expireStyles" :key="s" :label="s" :value="s" />
-              </el-select>
-              <el-input-number v-model="textExpireValue" :min="1" style="margin-left: 12px" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="sharing" @click="onTextShare">创建文本分享</el-button>
-            </el-form-item>
-            <el-form-item v-if="lastShareResult">
-              <el-alert
-                type="success"
-                show-icon
-                :closable="false"
-                :title="`本次取件码：${lastShareResult.code}`"
-              >
-                <template #default>
-                  <el-button link type="primary" @click="copyText(lastShareResult.code, '取件码已复制')">复制取件码</el-button>
-                  <el-button link @click="copyPickupLink(lastShareResult.code)">复制链接</el-button>
-                  <el-button link @click="openQrDialog(lastShareResult.code)">二维码</el-button>
-                </template>
-              </el-alert>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <el-tab-pane label="文件分享" name="file">
-          <el-form label-width="120px">
-            <el-form-item label="选择文件">
-              <input type="file" @change="onFilePicked" />
-            </el-form-item>
-            <el-form-item label="过期策略">
-              <el-select v-model="fileExpireStyle" style="width: 180px">
-                <el-option v-for="s in expireStyles" :key="s" :label="s" :value="s" />
-              </el-select>
-              <el-input-number v-model="fileExpireValue" :min="1" style="margin-left: 12px" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="sharing" @click="onFileShare">创建文件分享</el-button>
-            </el-form-item>
-            <el-form-item v-if="lastShareResult">
-              <el-alert
-                type="success"
-                show-icon
-                :closable="false"
-                :title="`本次取件码：${lastShareResult.code}`"
-              >
-                <template #default>
-                  <el-button link type="primary" @click="copyText(lastShareResult.code, '取件码已复制')">复制取件码</el-button>
-                  <el-button link @click="copyPickupLink(lastShareResult.code)">复制链接</el-button>
-                  <el-button link @click="openQrDialog(lastShareResult.code)">二维码</el-button>
-                </template>
-              </el-alert>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <el-tab-pane label="取件码访问" name="select">
-          <el-form inline>
-            <el-form-item label="取件码">
-              <el-input v-model="pickupCode" placeholder="请输入取件码" style="width: 220px" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="selecting" @click="onSelectByCode">取件</el-button>
-            </el-form-item>
-          </el-form>
-
-          <el-card v-if="selected" class="result-card" shadow="never">
-            <p><strong>名称：</strong>{{ selected.name }}</p>
-            <p><strong>大小：</strong>{{ selected.size }}</p>
-            <template v-if="selectedIsDownload">
-              <p><strong>下载链接：</strong>{{ selected.text }}</p>
-              <el-button type="success" @click="downloadSelectedFile">下载文件</el-button>
-            </template>
-            <template v-else>
-              <p><strong>文本内容：</strong></p>
-              <el-input :model-value="selected.text" type="textarea" :rows="5" readonly />
-            </template>
-          </el-card>
-        </el-tab-pane>
-
-        <el-tab-pane label="预签名上传" name="presign">
-          <el-form label-width="120px">
-            <el-form-item label="选择文件">
-              <input type="file" @change="onPresignFilePicked" />
-            </el-form-item>
-            <el-form-item label="过期策略">
-              <el-select v-model="presignExpireStyle" style="width: 180px">
-                <el-option v-for="s in expireStyles" :key="s" :label="s" :value="s" />
-              </el-select>
-              <el-input-number v-model="presignExpireValue" :min="1" style="margin-left: 12px" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="presignUploading" @click="onPresignUpload">开始预签名上传</el-button>
-            </el-form-item>
-            <el-form-item v-if="presignMode">
-              <el-tag type="info">当前模式：{{ presignMode }}</el-tag>
-              <span class="upload-url" v-if="presignUploadUrl">{{ presignUploadUrl }}</span>
-            </el-form-item>
-            <el-form-item v-if="lastShareResult">
-              <el-alert
-                type="success"
-                show-icon
-                :closable="false"
-                :title="`本次取件码：${lastShareResult.code}`"
-              >
-                <template #default>
-                  <el-button link type="primary" @click="copyText(lastShareResult.code, '取件码已复制')">复制取件码</el-button>
-                  <el-button link @click="copyPickupLink(lastShareResult.code)">复制链接</el-button>
-                  <el-button link @click="openQrDialog(lastShareResult.code)">二维码</el-button>
-                </template>
-              </el-alert>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-      </el-tabs>
-    </el-card>
-
-    <el-drawer v-model="sendHistoryVisible" title="发件记录" direction="rtl" size="440px">
-      <template #header>
-        <div class="drawer-title">
-          <span>发件记录</span>
-          <el-button link type="danger" @click="clearSendHistory">清空</el-button>
+        <div class="stat-item">
+          <span class="stat-label">发件记录</span>
+          <span class="stat-value">{{ sendCount }}</span>
         </div>
-      </template>
+        <div class="stat-item">
+          <span class="stat-label">取件记录</span>
+          <span class="stat-value">{{ pickupCount }}</span>
+        </div>
+      </div>
+    </header>
 
-      <el-empty v-if="sendHistories.length === 0" description="暂无发件记录" />
-      <div v-else class="history-list">
-        <el-card v-for="item in sendHistories" :key="item.id" shadow="never" class="history-item">
-          <div class="history-top">
-            <el-tag size="small">{{ item.kind }}</el-tag>
-            <span class="history-time">{{ formatDateTime(item.createdAt) }}</span>
+    <!-- Main Layout Grid -->
+    <div class="main-layout">
+      <!-- Left Column: Actions & Forms -->
+      <div class="action-column">
+        <el-card class="box-card form-card" shadow="hover">
+          <el-tabs v-model="activeTab" class="custom-tabs">
+            <el-tab-pane label="文本快传" name="text"></el-tab-pane>
+            <el-tab-pane label="文件快传" name="file"></el-tab-pane>
+            <el-tab-pane label="直传上传" name="presign"></el-tab-pane>
+            <el-tab-pane label="取件验证" name="select"></el-tab-pane>
+          </el-tabs>
+
+          <div class="tab-content">
+            <!-- Text Share -->
+            <transition name="fade-slide" mode="out-in">
+              <div v-if="activeTab === 'text'" class="form-panel">
+                <el-input
+                  v-model="textContent"
+                  type="textarea"
+                  :rows="10"
+                  maxlength="220000"
+                  show-word-limit
+                  placeholder="在此输入或粘贴您要发送的文本内容"
+                  class="custom-textarea"
+                />
+                <div class="settings-row">
+                  <div class="setting-item">
+                    <span class="setting-label"><el-icon><Clock /></el-icon> 过期策略</span>
+                    <el-select v-model="textExpireStyle" class="full-width">
+                      <el-option v-for="item in expireStyles" :key="item" :label="item" :value="item" />
+                    </el-select>
+                  </div>
+                  <div class="setting-item">
+                    <span class="setting-label">有效数值</span>
+                    <el-input-number v-model="textExpireValue" :min="1" class="full-width" />
+                  </div>
+                </div>
+                <el-button type="primary" size="large" class="submit-btn" :loading="sharing" @click="onTextShare">
+                  <el-icon class="el-icon--left"><Connection /></el-icon> 生成文本取件码
+                </el-button>
+              </div>
+
+              <!-- File Share -->
+              <div v-else-if="activeTab === 'file'" class="form-panel">
+                <label class="modern-dropzone" :class="{ 'has-file': fileToShare }">
+                  <input type="file" @change="onFilePicked" hidden />
+                  <el-icon class="dropzone-icon"><UploadFilled /></el-icon>
+                  <strong class="dropzone-title">{{ fileToShare ? fileToShare.name : '点击或拖拽文件到这里' }}</strong>
+                  <span class="dropzone-desc">{{ fileToShare ? formatSize(fileToShare.size) : '普通文件走标准快传链路' }}</span>
+                </label>
+                <div class="settings-row">
+                  <div class="setting-item">
+                    <span class="setting-label"><el-icon><Clock /></el-icon> 过期策略</span>
+                    <el-select v-model="fileExpireStyle" class="full-width">
+                      <el-option v-for="item in expireStyles" :key="item" :label="item" :value="item" />
+                    </el-select>
+                  </div>
+                  <div class="setting-item">
+                    <span class="setting-label">有效数值</span>
+                    <el-input-number v-model="fileExpireValue" :min="1" class="full-width" />
+                  </div>
+                </div>
+                <el-button type="primary" size="large" class="submit-btn" :loading="sharing" @click="onFileShare">
+                  <el-icon class="el-icon--left"><Document /></el-icon> 创建文件快传
+                </el-button>
+              </div>
+
+              <!-- Presign Share -->
+              <div v-else-if="activeTab === 'presign'" class="form-panel">
+                <label class="modern-dropzone" :class="{ 'has-file': presignFile }">
+                  <input type="file" @change="onPresignFilePicked" hidden />
+                  <el-icon class="dropzone-icon"><UploadFilled /></el-icon>
+                  <strong class="dropzone-title">{{ presignFile ? presignFile.name : '选择要直传的大文件' }}</strong>
+                  <span class="dropzone-desc">{{ presignFile ? formatSize(presignFile.size) : '适合对象存储直传和大文件场景' }}</span>
+                </label>
+                <div class="settings-row">
+                  <div class="setting-item">
+                    <span class="setting-label"><el-icon><Clock /></el-icon> 过期策略</span>
+                    <el-select v-model="presignExpireStyle" class="full-width">
+                      <el-option v-for="item in expireStyles" :key="item" :label="item" :value="item" />
+                    </el-select>
+                  </div>
+                  <div class="setting-item">
+                    <span class="setting-label">有效数值</span>
+                    <el-input-number v-model="presignExpireValue" :min="1" class="full-width" />
+                  </div>
+                </div>
+                <el-button type="primary" size="large" class="submit-btn" :loading="presignUploading" @click="onPresignUpload">
+                  开始直传文件
+                </el-button>
+                <div v-if="presignMode" class="status-alert">
+                  <strong>上传模式：{{ presignMode }}</strong>
+                  <p>{{ presignUploadUrl || '当前模式无需展示上传地址' }}</p>
+                </div>
+              </div>
+
+              <!-- Pickup Share -->
+              <div v-else class="form-panel">
+                <div class="pickup-input-wrapper">
+                  <el-input
+                    v-model="pickupCode"
+                    placeholder="请输入 32 位取件码"
+                    size="large"
+                    maxlength="32"
+                    clearable
+                    @keyup.enter="onSelectByCode"
+                    class="pickup-input"
+                  >
+                    <template #append>
+                      <el-button type="primary" :loading="selecting" @click="onSelectByCode">
+                        立即验证
+                      </el-button>
+                    </template>
+                  </el-input>
+                </div>
+
+                <div v-if="pickupPreviewList.length" class="quick-pickup-chips">
+                  <span class="chips-label">最近取件记录：</span>
+                  <el-tag
+                    v-for="item in pickupPreviewList"
+                    :key="item.id"
+                    class="pickup-chip"
+                    type="info"
+                    effect="plain"
+                    round
+                    @click="fillPickupCode(item.code)"
+                  >
+                    {{ item.code }} <span class="chip-name">{{ item.name }}</span>
+                  </el-tag>
+                </div>
+              </div>
+            </transition>
           </div>
-          <div class="history-line"><strong>取件码：</strong>{{ item.code }}</div>
-          <div class="history-line"><strong>名称：</strong>{{ item.name || '-' }}</div>
-          <el-space>
-            <el-button link type="primary" @click="copyText(item.code, '取件码已复制')">复制取件码</el-button>
-            <el-button link @click="copyPickupLink(item.code)">复制链接</el-button>
-            <el-button link @click="openQrDialog(item.code)">二维码</el-button>
-            <el-button link @click="fillPickupCode(item.code)">去取件页</el-button>
-          </el-space>
         </el-card>
+      </div>
+
+      <!-- Right Column: Results & History -->
+      <div class="result-column">
+        <!-- Action Dashboard -->
+        <el-card class="box-card result-card" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <span>{{ activeTab === 'select' ? '取件结果' : '分发结果' }}</span>
+              <el-button v-if="activeTab !== 'select' && lastShareResult" link type="primary" @click="goPickupSpace(lastShareResult.code)">
+                打开空间 <el-icon class="el-icon--right"><TopRight /></el-icon>
+              </el-button>
+              <el-button v-if="activeTab === 'select' && selected" link type="primary" @click="goPickupSpace(pickupCode)">
+                打开空间 <el-icon class="el-icon--right"><TopRight /></el-icon>
+              </el-button>
+            </div>
+          </template>
+
+          <transition name="fade-slide" mode="out-in">
+            <!-- Share Mode Result -->
+            <div v-if="activeTab !== 'select' && lastShareResult" class="share-result">
+              <div class="success-icon"><el-icon><Check /></el-icon></div>
+              <h3 class="result-code">{{ lastShareResult.code }}</h3>
+              <p class="result-name">{{ lastShareResult.name || '未设置显示名称' }}</p>
+              
+              <div class="action-buttons-group">
+                <el-button type="primary" round @click="copyText(lastShareResult.code, '取件码已复制')">
+                  复制取件码
+                </el-button>
+                <el-button round @click="copyPickupLink(lastShareResult.code)">复制链接</el-button>
+                <el-button round @click="openQrDialog(lastShareResult.code)">二维码</el-button>
+              </div>
+            </div>
+
+            <!-- Pickup Mode Result -->
+            <div v-else-if="activeTab === 'select' && selected" class="pickup-result">
+              <div class="pickup-info-grid">
+                <div class="info-block">
+                  <span class="info-label">内容名称</span>
+                  <span class="info-value text-ellipsis" :title="selected.name">{{ selected.name || '--' }}</span>
+                </div>
+                <div class="info-block">
+                  <span class="info-label">文件大小</span>
+                  <span class="info-value">{{ formatSize(selected.size) }}</span>
+                </div>
+                <div class="info-block">
+                  <span class="info-label">类型</span>
+                  <el-tag size="small" :type="selectedIsDownload ? 'success' : 'warning'">
+                    {{ selectedIsDownload ? '文件' : '文本' }}
+                  </el-tag>
+                </div>
+              </div>
+
+              <div class="pickup-action-area">
+                <template v-if="selectedIsDownload">
+                  <el-button type="primary" class="full-width" size="large" @click="downloadSelectedFile">
+                    <el-icon class="el-icon--left"><Bottom /></el-icon> 立即下载文件
+                  </el-button>
+                </template>
+                <template v-else>
+                  <el-input :model-value="selectedTextPreview" type="textarea" :rows="8" readonly class="readonly-textarea"/>
+                  <el-button plain class="full-width mt-10" @click="copyText(selected.text || '', '内容已复制到剪贴板')">
+                    <el-icon class="el-icon--left"><CopyDocument /></el-icon> 复制由于内容
+                  </el-button>
+                </template>
+              </div>
+            </div>
+
+            <div v-else class="empty-state">
+              <el-empty :description="activeTab === 'select' ? '请输入取件码验证后查看内容' : '提交文件或文本后，这里将生成取件码'" :image-size="80" />
+            </div>
+          </transition>
+        </el-card>
+
+        <!-- Quick Histories -->
+        <el-card class="box-card history-card" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <span>活动记录</span>
+            </div>
+          </template>
+          
+          <div class="history-actions">
+            <el-button plain size="small" @click="sendHistoryVisible = true">查看所有发件</el-button>
+            <el-button plain size="small" @click="pickupHistoryVisible = true">查看所有取件</el-button>
+          </div>
+          
+          <div v-if="sendPreviewList.length || pickupPreviewList.length" class="mini-history-list">
+             <div class="list-title" v-if="sendPreviewList.length">最近发件</div>
+             <div 
+               v-for="item in sendPreviewList.slice(0, 2)" :key="'s-'+item.id" 
+               class="mini-history-item"
+               @click="goPickupSpace(item.code)"
+             >
+                <div class="item-main">
+                  <span class="item-code">{{ item.code }}</span>
+                  <span class="item-name">{{ item.name || '未命名' }}</span>
+                </div>
+                <el-tag size="small" type="info">{{ item.kind }}</el-tag>
+             </div>
+             
+             <div class="list-title mt-10" v-if="pickupPreviewList.length">最近取件</div>
+             <div 
+               v-for="item in pickupPreviewList.slice(0, 2)" :key="'p-'+item.id" 
+               class="mini-history-item"
+               @click="fillPickupCode(item.code)"
+             >
+                <div class="item-main">
+                  <span class="item-code">{{ item.code }}</span>
+                  <span class="item-name">{{ item.name }}</span>
+                </div>
+                <el-tag size="small" :type="item.isFile ? 'success' : 'warning'">{{ item.isFile ? '文件' : '文本' }}</el-tag>
+             </div>
+          </div>
+          <el-empty v-else description="暂无活动记录" :image-size="50" />
+        </el-card>
+      </div>
+    </div>
+
+    <!-- Modals & Drawers -->
+    <el-drawer v-model="sendHistoryVisible" title="发件历史" direction="rtl" size="460px" class="custom-drawer">
+      <template #header>
+        <div class="drawer-header-content">
+          <span class="draw-title">全部发件记录</span>
+          <el-button type="danger" link @click="clearSendHistory">清空记录</el-button>
+        </div>
+      </template>
+
+      <el-empty v-if="sendHistories.length === 0" description="暂无发件历史" />
+      <div v-else class="drawer-list">
+        <div v-for="item in sendHistories" :key="item.id" class="drawer-item">
+          <div class="drawer-item-header">
+            <span class="drawer-code">{{ item.code }}</span>
+            <span class="drawer-time">{{ formatDateTime(item.createdAt) }}</span>
+          </div>
+          <div class="drawer-item-body">{{ item.name || '未命名内容' }}</div>
+          <div class="drawer-item-actions">
+            <el-button link type="primary" size="small" @click="copyText(item.code, '取件码已复制')">复制取件码</el-button>
+            <el-button link size="small" @click="copyPickupLink(item.code)">复制链接</el-button>
+            <el-button link size="small" @click="openQrDialog(item.code)">二维码</el-button>
+            <el-button link size="small" @click="goPickupSpace(item.code)">打开</el-button>
+          </div>
+        </div>
       </div>
     </el-drawer>
 
-    <el-drawer v-model="pickupHistoryVisible" title="取件记录" direction="rtl" size="440px">
+    <el-drawer v-model="pickupHistoryVisible" title="取件历史" direction="rtl" size="460px" class="custom-drawer">
       <template #header>
-        <div class="drawer-title">
-          <span>取件记录</span>
-          <el-button link type="danger" @click="clearPickupHistory">清空</el-button>
+        <div class="drawer-header-content">
+          <span class="draw-title">全部取件记录</span>
+          <el-button type="danger" link @click="clearPickupHistory">清空记录</el-button>
         </div>
       </template>
 
-      <el-empty v-if="pickupHistories.length === 0" description="暂无取件记录" />
-      <div v-else class="history-list">
-        <el-card v-for="item in pickupHistories" :key="item.id" shadow="never" class="history-item">
-          <div class="history-top">
-            <el-tag size="small" :type="item.isFile ? 'success' : 'info'">{{ item.isFile ? '文件' : '文本' }}</el-tag>
-            <span class="history-time">{{ formatDateTime(item.createdAt) }}</span>
+      <el-empty v-if="pickupHistories.length === 0" description="暂无取件历史" />
+      <div v-else class="drawer-list">
+        <div v-for="item in pickupHistories" :key="item.id" class="drawer-item">
+          <div class="drawer-item-header">
+            <span class="drawer-code">{{ item.code }}</span>
+            <span class="drawer-time">{{ formatDateTime(item.createdAt) }}</span>
           </div>
-          <div class="history-line"><strong>取件码：</strong>{{ item.code }}</div>
-          <div class="history-line"><strong>名称：</strong>{{ item.name }}</div>
-          <div class="history-line"><strong>大小：</strong>{{ item.size }}</div>
-          <el-space>
-            <el-button link type="primary" @click="copyText(item.code, '取件码已复制')">复制取件码</el-button>
-            <el-button link @click="copyPickupLink(item.code)">复制链接</el-button>
-            <el-button link @click="openQrDialog(item.code)">二维码</el-button>
-            <el-button link @click="fillPickupCode(item.code)">再次取件</el-button>
-          </el-space>
-        </el-card>
+          <div class="drawer-item-body">{{ item.name }}</div>
+          <div class="drawer-item-actions">
+            <el-button link type="primary" size="small" @click="fillPickupCode(item.code)">填入验证</el-button>
+            <el-button link size="small" @click="copyText(item.code, '取件码已复制')">复制取件码</el-button>
+            <el-button link size="small" @click="goPickupSpace(item.code)">直接打开</el-button>
+          </div>
+        </div>
       </div>
     </el-drawer>
 
-    <el-dialog v-model="qrDialogVisible" title="扫码取件" width="420px" align-center>
-      <div class="qr-panel" v-loading="qrLoading">
-        <img v-if="qrImageData" :src="qrImageData" alt="取件二维码" class="qr-image" />
-        <div class="qr-hint">使用移动端扫码，可直接进入取件页并自动填充取件码。</div>
-        <el-input :model-value="qrLink" readonly />
-        <div class="qr-actions">
-          <el-button type="primary" @click="copyText(qrLink, '取件链接已复制')">复制取件链接</el-button>
+    <el-dialog v-model="qrDialogVisible" title="扫码取件" width="380px" align-center custom-class="qr-dialog">
+      <div class="qr-container" v-loading="qrLoading">
+        <div class="qr-wrapper">
+          <img v-if="qrImageData" :src="qrImageData" alt="取件二维码" />
         </div>
+        <p class="qr-tip">使用手机相机或其他扫码工具扫描提取</p>
+        <el-input :model-value="qrLink" readonly class="qr-input">
+          <template #append>
+            <el-button type="primary" @click="copyText(qrLink, '取件链接已复制')">复制链接</el-button>
+          </template>
+        </el-input>
       </div>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.fcb-share-page {
+/* Base Layout & Variables */
+.page-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  min-height: 100vh;
+  background-color: var(--el-bg-color-page, #f8fafc);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Header Section */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #e2e8f0);
+}
+
+.header-content .title {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--el-text-color-primary, #0f172a);
+  letter-spacing: -0.5px;
+}
+
+.header-content .subtitle {
+  margin: 0;
+  font-size: 15px;
+  color: var(--el-text-color-secondary, #64748b);
+}
+
+.header-stats {
+  display: flex;
+  gap: 32px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary, #64748b);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #0f172a);
+}
+.stat-value.primary {
+  color: var(--el-color-primary, #409eff);
+}
+
+/* Main Grid Layout */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  align-items: start;
+}
+
+.box-card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.04) !important;
+  background: #ffffff;
+}
+
+/* Form Styles */
+.form-card {
+  min-height: 550px;
+}
+.custom-tabs :deep(.el-tabs__item) {
+  font-size: 16px;
+  padding: 0 24px;
+  height: 48px;
+  line-height: 48px;
+}
+.form-panel {
+  padding: 16px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.custom-textarea :deep(.el-textarea__inner) {
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 15px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  transition: all 0.3s;
+}
+.custom-textarea :deep(.el-textarea__inner:focus) {
+  background-color: #ffffff;
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
+}
+
+/* Dropzone Styles */
+.modern-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 240px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  background-color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.modern-dropzone:hover, .modern-dropzone.has-file {
+  border-color: var(--el-color-primary);
+  background-color: #f0f9ff;
+}
+.dropzone-icon {
+  font-size: 48px;
+  color: #94a3b8;
+  margin-bottom: 16px;
+  transition: color 0.3s ease;
+}
+.modern-dropzone:hover .dropzone-icon, .modern-dropzone.has-file .dropzone-icon {
+  color: var(--el-color-primary);
+}
+.dropzone-title {
+  font-size: 16px;
+  color: #334155;
+  margin-bottom: 8px;
+}
+.dropzone-desc {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Settings Row */
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding-top: 8px;
+}
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.setting-label {
+  font-size: 14px;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.full-width {
+  width: 100%;
+}
+
+.submit-btn {
+  height: 52px;
+  font-size: 16px;
+  border-radius: 12px;
+  margin-top: 16px;
+}
+
+/* Pickup Specific */
+.pickup-input :deep(.el-input__wrapper) {
+  padding-left: 16px;
+  height: 56px;
+  font-size: 16px;
+  border-radius: 12px 0 0 12px;
+}
+.pickup-input :deep(.el-input-group__append) {
+  border-radius: 0 12px 12px 0;
+  background-color: var(--el-color-primary);
+  color: white;
+  border: none;
+  padding: 0 24px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pickup-input :deep(.el-input-group__append:hover) {
+  opacity: 0.9;
+}
+.quick-pickup-chips {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.chips-label {
+  font-size: 13px;
+  color: #64748b;
+}
+.pickup-chip {
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background-color: #f1f5f9;
+}
+.pickup-chip:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+}
+.chip-name {
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+/* Result Column */
+.result-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: #0f172a;
+}
+.empty-state {
+  padding: 40px 0;
+}
+
+/* Share Results */
+.share-result {
+  text-align: center;
+  padding: 24px 0;
+}
+.success-icon {
+  width: 56px;
+  height: 56px;
+  background-color: #f0fdf4;
+  color: #22c55e;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 24px;
+}
+.result-code {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--el-color-primary);
+  letter-spacing: 2px;
+  margin: 0 0 12px 0;
+  line-height: 1;
+}
+.result-name {
+  color: #64748b;
+  margin: 0 0 32px 0;
+}
+.action-buttons-group {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Pickup Results */
+.pickup-result {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.pickup-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  background-color: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.info-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.info-label {
+  font-size: 12px;
+  color: #64748b;
+}
+.info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mt-10 {
+  margin-top: 10px;
+}
+
+/* Histories Sidebar */
+.history-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.mini-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.list-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+.mini-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f8fafc;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+.mini-history-item:hover {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.item-code {
+  font-weight: 600;
+  color: #0f172a;
+  display: block;
+}
+.item-name {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Drawers */
+.drawer-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.draw-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+.drawer-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 0 8px;
 }
-
-.card-title {
-  font-weight: 700;
+.drawer-item {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
 }
-
-.header-row {
+.drawer-item-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-}
-
-.result-card {
-  margin-top: 8px;
-}
-
-.upload-url {
-  margin-left: 10px;
-  color: #909399;
-  word-break: break-all;
-}
-
-.drawer-title {
-  width: 100%;
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.history-item {
-  border: 1px solid #ebeef5;
-}
-
-.history-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 8px;
 }
-
-.history-time {
-  color: #8a98a8;
+.drawer-code {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--el-color-primary);
+}
+.drawer-time {
   font-size: 12px;
+  color: #94a3b8;
+}
+.drawer-item-body {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 12px;
+}
+.drawer-item-actions {
+  display: flex;
+  gap: 8px;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 12px;
 }
 
-.history-line {
-  line-height: 1.9;
-  color: #2c3e50;
-}
-
-.qr-panel {
+/* QR Code Dialog */
+.qr-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  min-height: 120px;
+  padding: 10px 0;
 }
-
-.qr-image {
-  width: 240px;
-  height: 240px;
-  object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid #ebeef5;
-  padding: 8px;
-  background: #fff;
+.qr-wrapper {
+  background: white;
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  margin-bottom: 16px;
 }
-
-.qr-hint {
-  color: #6b7280;
-  font-size: 13px;
-  text-align: center;
+.qr-wrapper img {
+  width: 220px;
+  height: 220px;
+  display: block;
 }
-
-.qr-actions {
+.qr-tip {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.qr-input {
   width: 100%;
-  display: flex;
-  justify-content: center;
+}
+
+/* Animations */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+  .header-stats {
+    display: none;
+  }
+}
+@media (max-width: 768px) {
+  .page-container {
+    padding: 16px;
+  }
+  .settings-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

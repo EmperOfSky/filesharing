@@ -1,200 +1,518 @@
-<script setup lang="ts">
-import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+﻿<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
+
+interface NavItem {
+  key: string
+  title: string
+  route: string
+  icon: string
+  match: string[]
+}
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
+const mobileNavVisible = ref(false)
+
 const isAdmin = computed(() => authStore.user?.role === 'ADMIN')
 
-const navItems = computed(() => {
-  const base = [
-    { index: '1', title: '仪表板', route: '/dashboard', icon: 'House' },
-    { index: '2', title: '文件管理', route: '/dashboard/files', icon: 'Document' },
-    { index: '3', title: '搜索', route: '/dashboard/search', icon: 'Search' },
-    { index: '4', title: '分享管理', route: '/dashboard/shares', icon: 'Share' },
-    { index: '5', title: '兼容分享', route: '/dashboard/compat-share', icon: 'Connection' },
-    { index: '6', title: '个人中心', route: '/dashboard/profile', icon: 'User' }
-  ]
-  if (isAdmin.value) {
-    base.splice(5, 0, { index: '7', title: '兼容配置', route: '/dashboard/compat-config', icon: 'Setting' })
-    base.splice(6, 0, { index: '8', title: '兼容记录', route: '/dashboard/compat-records', icon: 'List' })
+const navItems = computed<NavItem[]>(() => [
+  {
+    key: 'dashboard',
+    title: '工作台',
+    route: '/dashboard',
+    icon: 'House',
+    match: ['/dashboard']
+  },
+  {
+    key: 'quick-transfer',
+    title: '快传中心',
+    route: '/dashboard/quick-transfer',
+    icon: 'Connection',
+    match: ['/dashboard/quick-transfer', '/dashboard/files']
+  },
+  {
+    key: 'search',
+    title: '搜索',
+    route: '/dashboard/search',
+    icon: 'Search',
+    match: ['/dashboard/search']
+  },
+  {
+    key: 'shares',
+    title: '分享管理',
+    route: '/dashboard/shares',
+    icon: 'Share',
+    match: ['/dashboard/shares']
+  },
+  {
+    key: 'recycle',
+    title: '回收站',
+    route: '/dashboard/recycle-bin',
+    icon: 'Delete',
+    match: ['/dashboard/recycle-bin']
+  },
+  {
+    key: 'recommendation',
+    title: '智能推荐',
+    route: '/dashboard/recommendations',
+    icon: 'Star',
+    match: ['/dashboard/recommendations']
+  },
+  {
+    key: 'collaboration',
+    title: '协作文档',
+    route: '/dashboard/collaboration',
+    icon: 'EditPen',
+    match: ['/dashboard/collaboration']
+  },
+  {
+    key: 'pickup',
+    title: '取件空间',
+    route: '/dashboard/pickup-space',
+    icon: 'FolderChecked',
+    match: ['/dashboard/pickup-space']
+  },
+  {
+    key: 'backup',
+    title: '数据备份',
+    route: '/dashboard/backup',
+    icon: 'Coin',
+    match: ['/dashboard/backup']
   }
-  return base
+])
+
+const activeKey = computed(() => {
+  const currentPath = route.path
+
+  if (currentPath === '/dashboard' || currentPath === '/dashboard/') {
+    return 'dashboard'
+  }
+
+  const matched = navItems.value.find((item) =>
+    item.match.some((prefix) =>
+      prefix === '/dashboard'
+        ? currentPath === '/dashboard'
+        : currentPath.startsWith(prefix)
+    )
+  )
+
+  return matched?.key || 'dashboard'
 })
 
-const activeIndex = computed(() => {
-  const item = navItems.value.find((nav) => nav.route === route.path)
-  if (item) {
-    return item.index
-  }
-  if (route.path === '/dashboard') {
-    return '1'
-  }
-  return '1'
+const currentSection = computed(() => {
+  const matched = navItems.value.find((item) => item.key === activeKey.value)
+  return matched?.title || '工作台'
 })
 
-const handleSelect = (key: string) => {
-  const item = navItems.value.find(nav => nav.index === key)
-  if (item) {
-    router.push(item.route)
+const roleLabel = computed(() => (isAdmin.value ? '管理员' : '成员账号'))
+
+const navigateTo = (targetRoute: string) => {
+  mobileNavVisible.value = false
+  if (route.path !== targetRoute) {
+    router.push(targetRoute)
   }
 }
 
 const handleLogout = async () => {
   try {
-    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-      confirmButtonText: '确定',
+    await ElMessageBox.confirm('确定要退出当前账号吗？', '退出登录', {
+      confirmButtonText: '退出',
       cancelButtonText: '取消',
       type: 'warning'
     })
+
     authStore.logout()
     router.push('/login')
   } catch {
-    // 用户取消操作
+    // 用户取消退出
   }
 }
 
 onMounted(() => {
-  // 初始化时获取当前用户信息
-  if (authStore.token) {
-    authStore.fetchCurrentUser().catch(() => {
-      authStore.logout()
-      router.push('/login')
-    })
+  if (!authStore.token) {
+    router.push('/login')
+    return
   }
+
+  authStore.fetchCurrentUser().catch(() => {
+    authStore.logout()
+    router.push('/login')
+  })
 })
 </script>
 
 <template>
-  <el-container class="layout-container">
-    <el-header class="layout-header">
-      <div class="header-left">
-        <div class="logo">
-          <el-icon size="24"><FolderOpened /></el-icon>
-          <span class="logo-text">文件共享系统</span>
-        </div>
-      </div>
-      
-      <div class="header-center">
-        <el-menu
-          :default-active="activeIndex"
-          class="nav-menu"
-          mode="horizontal"
-          @select="handleSelect"
-        >
-          <el-menu-item 
-            v-for="item in navItems" 
-            :key="item.index" 
-            :index="item.index"
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="header-inner">
+        <button class="brand-block" type="button" @click="navigateTo('/dashboard')">
+          <div class="brand-mark">
+            <el-icon :size="20"><FolderOpened /></el-icon>
+          </div>
+          <div class="brand-copy">
+            <span class="brand-kicker">FILE SHARING STUDIO</span>
+            <strong>文件共享中心</strong>
+          </div>
+        </button>
+
+        <nav class="nav-cluster" aria-label="主导航">
+          <button
+            v-for="item in navItems"
+            :key="item.key"
+            type="button"
+            class="nav-pill"
+            :class="{ active: activeKey === item.key }"
+            @click="navigateTo(item.route)"
           >
             <el-icon><component :is="item.icon" /></el-icon>
             <span>{{ item.title }}</span>
-          </el-menu-item>
-        </el-menu>
-      </div>
-      
-      <div class="header-right">
-        <el-dropdown>
-          <div class="user-info">
-            <el-avatar :size="32" :src="authStore.user?.avatar">
-              {{ authStore.user?.username?.charAt(0)?.toUpperCase() }}
-            </el-avatar>
-            <span class="username">{{ authStore.user?.username }}</span>
-            <el-icon><ArrowDown /></el-icon>
+          </button>
+        </nav>
+
+        <div class="header-right">
+          <div class="header-chip">
+            <span class="chip-label">当前区块</span>
+            <strong>{{ currentSection }}</strong>
           </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="$router.push('/dashboard/profile')">
-                <el-icon><User /></el-icon>个人中心
-              </el-dropdown-item>
-              <el-dropdown-item @click="handleLogout" divided>
-                <el-icon><SwitchButton /></el-icon>退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+          <div class="header-chip subtle">
+            <span class="chip-label">账户角色</span>
+            <strong>{{ roleLabel }}</strong>
+          </div>
+          <div v-if="isAdmin" class="header-tip">
+          </div>
+          <el-dropdown trigger="click">
+            <button type="button" class="user-pill">
+              <el-avatar :size="38" :src="authStore.user?.avatar">
+                {{ authStore.user?.username?.charAt(0)?.toUpperCase() }}
+              </el-avatar>
+              <div class="user-copy">
+                <strong>{{ authStore.user?.username || '未登录' }}</strong>
+                <span>{{ authStore.user?.email || '点击查看账户操作' }}</span>
+              </div>
+              <el-icon><ArrowDown /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="navigateTo('/dashboard/profile')">
+                  <el-icon><User /></el-icon>
+                  个人中心
+                </el-dropdown-item>
+                <el-dropdown-item @click="navigateTo('/dashboard/quick-transfer')">
+                  <el-icon><Connection /></el-icon>
+                  快传中心
+                </el-dropdown-item>
+                <el-dropdown-item divided @click="handleLogout">
+                  <el-icon><SwitchButton /></el-icon>
+                  退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button
+            class="mobile-trigger"
+            plain
+            circle
+            @click="mobileNavVisible = true"
+          >
+            <el-icon><Menu /></el-icon>
+          </el-button>
+        </div>
       </div>
-    </el-header>
-    
-    <el-main class="layout-main">
-      <router-view />
-    </el-main>
-  </el-container>
+    </header>
+
+    <main class="app-main">
+      <div class="app-main-inner">
+        <router-view />
+      </div>
+    </main>
+
+    <el-drawer
+      v-model="mobileNavVisible"
+      title="导航"
+      direction="rtl"
+      size="320px"
+      class="mobile-drawer"
+    >
+      <div class="mobile-drawer-inner">
+        <button
+          v-for="item in navItems"
+          :key="item.key"
+          type="button"
+          class="mobile-nav-item"
+          :class="{ active: activeKey === item.key }"
+          @click="navigateTo(item.route)"
+        >
+          <el-icon><component :is="item.icon" /></el-icon>
+          <span>{{ item.title }}</span>
+        </button>
+      </div>
+    </el-drawer>
+  </div>
 </template>
 
 <style scoped>
-.layout-container {
-  height: 100vh;
+.app-shell {
+  min-height: 100vh;
 }
 
-.layout-header {
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 20px 20px 0;
+}
+
+.header-inner {
+  width: min(var(--fs-content-width), 100%);
+  margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  background: white;
-  border-bottom: 1px solid #e6e6e6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.30);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.90);
+  box-shadow: var(--fs-shadow-md);
+  backdrop-filter: blur(22px);
 }
 
-.header-left {
-  flex: 0 0 auto;
-}
-
-.logo {
-  display: flex;
+.brand-block {
+  display: inline-flex;
   align-items: center;
+  gap: 14px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.brand-mark {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--fs-brand-1) 0%, var(--fs-brand-2) 100%);
+  color: white;
+  box-shadow: 0 16px 34px rgba(14, 165, 233, 0.30);
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.brand-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #0369a1;
+}
+
+.brand-copy strong {
+  font-size: 18px;
+  color: var(--fs-text-1);
+}
+
+.nav-cluster {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
 }
 
-.logo-text {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 15px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(248, 251, 255, 0.96);
+  color: var(--fs-text-2);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
-.header-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
+.nav-pill:hover {
+  transform: translateY(-1px);
+  border-color: rgba(129, 152, 237, 0.48);
+  color: #d7ddff;
+  background: rgba(34, 44, 88, 0.84);
 }
 
-.nav-menu {
-  border: none;
-  background: transparent;
+.nav-pill.active {
+  border-color: rgba(129, 152, 237, 0.52);
+  background: linear-gradient(135deg, rgba(109, 120, 247, 0.34), rgba(243, 71, 183, 0.26));
+  color: #f1f4ff;
+  box-shadow: 0 14px 28px rgba(109, 120, 247, 0.26);
 }
 
 .header-right {
-  flex: 0 0 auto;
-}
-
-.user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+}
+
+.header-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(248, 251, 255, 0.96);
+}
+
+.header-chip.subtle {
+  background: rgba(241, 245, 249, 0.92);
+}
+
+.chip-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fs-text-3);
+}
+
+.header-chip strong {
+  font-size: 13px;
+  color: var(--fs-text-1);
+}
+
+.header-tip {
+  max-width: 220px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fs-text-3);
+}
+
+.user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 9px 7px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(248, 251, 255, 0.96);
+  color: inherit;
   cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: background-color 0.3s;
 }
 
-.user-info:hover {
-  background-color: #f5f5f5;
+.user-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 
-.username {
-  font-size: 14px;
-  color: #333;
+.user-copy strong {
+  font-size: 13px;
+  color: var(--fs-text-1);
 }
 
-.layout-main {
-  padding: 20px;
-  background-color: #f5f5f5;
-  overflow-y: auto;
+.user-copy span {
+  max-width: 180px;
+  color: var(--fs-text-3);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-trigger {
+  display: none;
+}
+
+.app-main {
+  padding: 22px 20px 28px;
+}
+
+.app-main-inner {
+  width: min(var(--fs-content-width), 100%);
+  margin: 0 auto;
+}
+
+.mobile-drawer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--fs-text-2);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mobile-nav-item.active {
+  border-color: rgba(14, 165, 233, 0.4);
+  color: #0f172a;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(37, 99, 235, 0.14));
+}
+
+@media (max-width: 1380px) {
+  .header-chip,
+  .header-tip {
+    display: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .nav-cluster {
+    display: none;
+  }
+
+  .mobile-trigger {
+    display: inline-flex;
+  }
+
+  .header-inner {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-header {
+    padding: 14px 14px 0;
+  }
+
+  .app-main {
+    padding: 18px 14px 24px;
+  }
+
+  .header-inner {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .user-copy {
+    display: none;
+  }
+
+  .brand-copy strong {
+    font-size: 16px;
+  }
 }
 </style>
+

@@ -380,6 +380,14 @@ const fileService = {
     return extractData(response);
   },
 
+  // 获取分享监控详情
+  getShareMonitoring: async (shareId, limit = 20) => {
+    const response = await apiClient.get(`/shares/${shareId}/monitoring`, {
+      params: { limit }
+    });
+    return extractData(response);
+  },
+
   // 获取公开分享元信息
   getSharedFile: async (shareKey) => {
     const response = await apiClient.get(`/shares/public/${shareKey}`);

@@ -21,10 +21,10 @@ import javax.validation.Valid;
 import java.util.*;
 
 /**
- * FileCodeBox 兼容功能后台管理接口。
+ * 快传中心后台管理接口。
  */
 @RestController
-@RequestMapping("/api/admin/fcb")
+@RequestMapping({"/api/admin/quick-transfer", "/api/admin/fcb"})
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 @Validated
@@ -41,7 +41,7 @@ public class FileCodeBoxAdminController {
     @GetMapping("/config")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getConfig(HttpServletRequest request) {
         User admin = ensureAdmin(request);
-        logAdminAudit("FCB_ADMIN_CONFIG_READ", admin, request, "/api/admin/fcb/config", Collections.emptyMap());
+        logAdminAudit("FCB_ADMIN_CONFIG_READ", admin, request, "/api/admin/quick-transfer/config", Collections.emptyMap());
         return ResponseEntity.ok(ApiResponse.success(buildConfig()));
     }
 
@@ -91,7 +91,7 @@ public class FileCodeBoxAdminController {
         details.put("open_upload", fileCodeBoxProperties.isOpenUpload());
         details.put("upload_size", fileCodeBoxProperties.getUploadSize());
         details.put("expire_styles", fileCodeBoxProperties.getExpireStyles());
-        logAdminAudit("FCB_ADMIN_CONFIG_UPDATE", admin, request, "/api/admin/fcb/config", details);
+        logAdminAudit("FCB_ADMIN_CONFIG_UPDATE", admin, request, "/api/admin/quick-transfer/config", details);
 
         return ResponseEntity.ok(ApiResponse.success("配置更新成功", buildConfig()));
     }
@@ -112,7 +112,7 @@ public class FileCodeBoxAdminController {
         auditDetails.put("page", detail.get("number"));
         auditDetails.put("size", detail.get("size"));
         auditDetails.put("total", detail.get("totalElements"));
-        logAdminAudit("FCB_ADMIN_RECORD_LIST", admin, request, "/api/admin/fcb/records", auditDetails);
+        logAdminAudit("FCB_ADMIN_RECORD_LIST", admin, request, "/api/admin/quick-transfer/records", auditDetails);
         return ResponseEntity.ok(ApiResponse.success(detail));
     }
 
@@ -130,7 +130,7 @@ public class FileCodeBoxAdminController {
         details.put("share_type", shareType);
         details.put("rows", exportResult.getRowCount());
         details.put("file_name", exportResult.getFileName());
-        logAdminAudit("FCB_ADMIN_RECORD_EXPORT", admin, request, "/api/admin/fcb/records/export", details);
+        logAdminAudit("FCB_ADMIN_RECORD_EXPORT", admin, request, "/api/admin/quick-transfer/records/export", details);
 
         String contentDisposition = "attachment; filename=\"" + exportResult.getFileName() + "\"";
         return ResponseEntity.ok()
@@ -149,7 +149,7 @@ public class FileCodeBoxAdminController {
                                             auditDetails.put("record_id", recordId);
                                             auditDetails.put("target_status", body.getStatus());
                                             logAdminAudit("FCB_ADMIN_RECORD_STATUS_UPDATE", admin, request,
-                                                "/api/admin/fcb/records/" + recordId + "/status", auditDetails);
+                                                "/api/admin/quick-transfer/records/" + recordId + "/status", auditDetails);
         return ResponseEntity.ok(ApiResponse.success("状态已更新", detail));
     }
 
@@ -163,7 +163,7 @@ public class FileCodeBoxAdminController {
         Map<String, Object> auditDetails = new LinkedHashMap<>();
         auditDetails.put("record_id", recordId);
         logAdminAudit("FCB_ADMIN_RECORD_DELETE", admin, request,
-                "/api/admin/fcb/records/" + recordId, auditDetails);
+            "/api/admin/quick-transfer/records/" + recordId, auditDetails);
         return ResponseEntity.ok(ApiResponse.success("记录已删除", detail));
     }
 

@@ -4,11 +4,13 @@ import com.filesharing.dto.ShareCreateRequest;
 import com.filesharing.dto.ShareResponse;
 import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.Folder;
+import com.filesharing.entity.ShareClickLog;
 import com.filesharing.entity.ShareRecord;
 import com.filesharing.entity.User;
 import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.FileRepository;
 import com.filesharing.repository.FolderRepository;
+import com.filesharing.repository.ShareClickLogRepository;
 import com.filesharing.repository.ShareRepository;
 import com.filesharing.service.ShareService;
 import lombok.RequiredArgsConstructor;
@@ -19,13 +21,21 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 分享服务实现类
@@ -41,6 +51,7 @@ public class ShareServiceImpl implements ShareService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     
     private final ShareRepository shareRepository;
+    private final ShareClickLogRepository shareClickLogRepository;
     private final FileRepository fileRepository;
     private final FolderRepository folderRepository;
     private final PasswordEncoder passwordEncoder;
@@ -126,6 +137,19 @@ public class ShareServiceImpl implements ShareService {
         ShareRecord share = findShareByKey(shareKey);
         validateShareState(share, false);
         return convertToShareResponse(share);
+    }
+
+    @Override
+    public ShareResponse getPublicShareInfoWithTracking(String shareKey,
+                                                        String ipAddress,
+                                                        String address,
+                                                        String userAgent,
+                                                        String referer) {
+        ShareRecord share = findShareByKey(shareKey);
+        validateShareState(share, false);
+
+        ShareRecord saved = trackShareClick(share, ipAddress, address, userAgent, referer);
+        return convertToShareResponse(saved);
     }
     
     @Override
@@ -269,6 +293,58 @@ public class ShareServiceImpl implements ShareService {
 
         return new ShareStatistics(totalShares, activeShares, expiredShares, totalAccessCount);
     }
+
+        @Override
+        @Transactional(readOnly = true)
+        public Map<String, Object> getShareMonitoringDetails(Long shareId, User currentUser, int limit) {
+        ShareRecord share = getShareById(shareId);
+        ensureShareOwner(share, currentUser);
+
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        List<ShareClickLog> logs = shareClickLogRepository.findByShare_IdOrderByAccessedAtDesc(shareId);
+
+        long pv = logs.size();
+        long uv = logs.stream()
+            .map(ShareClickLog::getVisitorFingerprint)
+            .filter(Objects::nonNull)
+            .filter(value -> !value.isBlank())
+            .distinct()
+            .count();
+        long uip = logs.stream()
+            .map(ShareClickLog::getVisitorIp)
+            .filter(Objects::nonNull)
+            .filter(value -> !value.isBlank())
+            .distinct()
+            .count();
+
+        List<Map<String, Object>> recentVisits = logs.stream()
+            .limit(safeLimit)
+            .map(this::buildRecentVisitItem)
+            .toList();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("shareId", share.getId());
+        result.put("shareKey", share.getShareKey());
+        result.put("title", share.getTitle());
+        result.put("status", share.getStatus() == null ? null : share.getStatus().name());
+        result.put("pv", pv);
+        result.put("uv", uv);
+        result.put("uip", uip);
+        result.put("accessCount", share.getCurrentAccessCount() == null ? 0 : share.getCurrentAccessCount());
+        result.put("lastAccessAt", share.getLastAccessAt() == null ? null : share.getLastAccessAt().toString());
+        result.put("lastVisitorIp", share.getLastVisitorIp());
+        result.put("lastVisitorAddress", share.getLastVisitorAddress());
+        result.put("dailyTrend", buildDailyTrend(logs, 7));
+        result.put("topIps", buildTopDimension(logs, ShareClickLog::getVisitorIp, 5));
+        result.put("topAddresses", buildTopDimension(logs, ShareClickLog::getVisitorAddress, 5));
+        result.put("browserStats", buildTopDimension(logs, item -> parseBrowser(item.getUserAgent()), 6));
+        result.put("osStats", buildTopDimension(logs, item -> parseOs(item.getUserAgent()), 6));
+        result.put("deviceStats", buildTopDimension(logs, item -> parseDevice(item.getUserAgent()), 4));
+        result.put("refererStats", buildTopDimension(logs, ShareClickLog::getReferer, 6));
+        result.put("recentVisits", recentVisits);
+
+        return result;
+        }
     
     @Override
     public void cleanupExpiredShares() {
@@ -377,6 +453,185 @@ public class ShareServiceImpl implements ShareService {
     private boolean isBcryptHash(String raw) {
         return raw.startsWith("$2a$") || raw.startsWith("$2b$") || raw.startsWith("$2y$");
     }
+
+    private ShareRecord trackShareClick(ShareRecord share,
+                                        String ipAddress,
+                                        String address,
+                                        String userAgent,
+                                        String referer) {
+        String normalizedIp = normalizeText(ipAddress, 64, "unknown");
+        String normalizedAddress = normalizeText(address, 255, "unknown");
+        String normalizedAgent = normalizeText(userAgent, 500, "unknown");
+        String normalizedReferer = normalizeText(referer, 255, "direct");
+
+        ShareClickLog clickLog = new ShareClickLog();
+        clickLog.setShare(share);
+        clickLog.setShareKey(share.getShareKey());
+        clickLog.setVisitorIp(normalizedIp);
+        clickLog.setVisitorAddress(normalizedAddress);
+        clickLog.setUserAgent(normalizedAgent);
+        clickLog.setReferer(normalizedReferer);
+        clickLog.setVisitorFingerprint(buildVisitorFingerprint(normalizedIp, normalizedAgent));
+        shareClickLogRepository.save(clickLog);
+
+        long pvCount = shareClickLogRepository.countByShare_Id(share.getId());
+        long uvCount = shareClickLogRepository.countDistinctVisitorsByShareId(share.getId());
+
+        share.setPvCount(safeInt(pvCount));
+        share.setUvCount(safeInt(uvCount));
+        share.setLastVisitorIp(normalizedIp);
+        share.setLastVisitorAddress(normalizedAddress);
+        share.setLastAccessAt(LocalDateTime.now());
+        share.setUpdatedAt(LocalDateTime.now());
+        return shareRepository.save(share);
+    }
+
+    private String normalizeText(String raw, int maxLen, String defaultValue) {
+        if (raw == null || raw.isBlank()) {
+            return defaultValue;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.length() <= maxLen) {
+            return trimmed;
+        }
+        return trimmed.substring(0, maxLen);
+    }
+
+    private String buildVisitorFingerprint(String ipAddress, String userAgent) {
+        String source = ipAddress + "|" + userAgent;
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashed = digest.digest(source.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hashed.length * 2);
+            for (byte b : hashed) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            log.warn("构建访客指纹失败，退化为原始标识");
+            String fallback = source.replace('|', '_');
+            return normalizeText(fallback, 64, "unknown");
+        }
+    }
+
+    private int safeInt(long value) {
+        if (value > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (value < 0) {
+            return 0;
+        }
+        return (int) value;
+    }
+
+    private Map<String, Object> buildRecentVisitItem(ShareClickLog clickLog) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("ip", clickLog.getVisitorIp());
+        item.put("address", clickLog.getVisitorAddress());
+        item.put("referer", clickLog.getReferer());
+        item.put("browser", parseBrowser(clickLog.getUserAgent()));
+        item.put("os", parseOs(clickLog.getUserAgent()));
+        item.put("device", parseDevice(clickLog.getUserAgent()));
+        item.put("userAgent", clickLog.getUserAgent());
+        item.put("accessedAt", clickLog.getAccessedAt() == null ? null : clickLog.getAccessedAt().toString());
+        return item;
+    }
+
+    private List<Map<String, Object>> buildDailyTrend(List<ShareClickLog> logs, int days) {
+        LocalDate today = LocalDate.now();
+        Map<LocalDate, Long> grouped = logs.stream()
+                .filter(log -> log.getAccessedAt() != null)
+                .collect(Collectors.groupingBy(log -> log.getAccessedAt().toLocalDate(), Collectors.counting()));
+
+        List<Map<String, Object>> trend = new ArrayList<>();
+        for (int i = days - 1; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("date", date.toString());
+            item.put("count", grouped.getOrDefault(date, 0L));
+            trend.add(item);
+        }
+        return trend;
+    }
+
+    private List<Map<String, Object>> buildTopDimension(List<ShareClickLog> logs,
+                                                         Function<ShareClickLog, String> extractor,
+                                                         int topN) {
+        return logs.stream()
+                .map(extractor)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.groupingBy(value -> value, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .limit(topN)
+                .map(entry -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("name", entry.getKey());
+                    item.put("count", entry.getValue());
+                    return item;
+                })
+                .toList();
+    }
+
+    private String parseBrowser(String userAgent) {
+        String ua = userAgent == null ? "" : userAgent.toLowerCase(Locale.ROOT);
+        if (ua.contains("micromessenger")) {
+            return "WeChat";
+        }
+        if (ua.contains("edg/")) {
+            return "Edge";
+        }
+        if (ua.contains("chrome/")) {
+            return "Chrome";
+        }
+        if (ua.contains("firefox/")) {
+            return "Firefox";
+        }
+        if (ua.contains("safari/") && !ua.contains("chrome/")) {
+            return "Safari";
+        }
+        if (ua.contains("opera") || ua.contains("opr/")) {
+            return "Opera";
+        }
+        return "Other";
+    }
+
+    private String parseOs(String userAgent) {
+        String ua = userAgent == null ? "" : userAgent.toLowerCase(Locale.ROOT);
+        if (ua.contains("windows")) {
+            return "Windows";
+        }
+        if (ua.contains("android")) {
+            return "Android";
+        }
+        if (ua.contains("iphone") || ua.contains("ipad") || ua.contains("ios")) {
+            return "iOS";
+        }
+        if (ua.contains("mac os") || ua.contains("macintosh")) {
+            return "macOS";
+        }
+        if (ua.contains("linux")) {
+            return "Linux";
+        }
+        return "Other";
+    }
+
+    private String parseDevice(String userAgent) {
+        String ua = userAgent == null ? "" : userAgent.toLowerCase(Locale.ROOT);
+        if (ua.contains("ipad") || ua.contains("tablet")) {
+            return "Tablet";
+        }
+        if (ua.contains("mobile") || ua.contains("android") || ua.contains("iphone")) {
+            return "Mobile";
+        }
+        if (ua.isBlank() || "unknown".equals(ua)) {
+            return "Unknown";
+        }
+        return "Desktop";
+    }
     
     private ShareResponse convertToShareResponse(ShareRecord share) {
         ShareResponse response = new ShareResponse();
@@ -394,6 +649,13 @@ public class ShareServiceImpl implements ShareService {
         
         response.setMaxAccessCount(share.getMaxAccessCount());
         response.setCurrentAccessCount(share.getCurrentAccessCount());
+        response.setPvCount(share.getPvCount());
+        response.setUvCount(share.getUvCount());
+        response.setLastVisitorIp(share.getLastVisitorIp());
+        response.setLastVisitorAddress(share.getLastVisitorAddress());
+        if (share.getLastAccessAt() != null) {
+            response.setLastAccessAt(share.getLastAccessAt().toString());
+        }
         response.setStatus(share.getStatus().name());
         response.setAllowDownload(share.getAllowDownload());
         response.setRequiresPassword(share.getPassword() != null && !share.getPassword().isBlank());

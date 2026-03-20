@@ -7,13 +7,14 @@ import com.filesharing.service.SmartRecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -34,10 +35,12 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
     private final UserBehaviorStatisticsRepository userBehaviorStatisticsRepository;
     
     // 推荐算法参数
-    private static final double SIMILARITY_THRESHOLD = 0.6;
+    private static final double SIMILARITY_THRESHOLD = 0.45;
     private static final int MAX_RECOMMENDATIONS = 20;
     private static final int RECOMMENDATION_EXPIRE_DAYS = 7;
     private static final double DECAY_FACTOR = 0.95;
+    private static final int MAX_RECENT_USER_FILES = 30;
+    private static final int MAX_PUBLIC_CANDIDATES = 200;
     
     @Override
     @Transactional
@@ -121,6 +124,10 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
         
         recommendation.setIsAdopted(true);
         recommendation.setAdoptedAt(LocalDateTime.now());
+        if (!Boolean.TRUE.equals(recommendation.getIsViewed())) {
+            recommendation.setIsViewed(true);
+            recommendation.setViewedAt(LocalDateTime.now());
+        }
         smartRecommendationRepository.save(recommendation);
         
         log.info("标记推荐已采纳: 用户={}, 推荐ID={}, 类型={}", 
@@ -130,7 +137,8 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
     @Override
     @Transactional
     public void cleanupExpiredRecommendations() {
-        LocalDateTime expiredDate = LocalDateTime.now().minusDays(RECOMMENDATION_EXPIRE_DAYS);
+        // 过期清理应以当前时间为准，删除所有已过期记录。
+        LocalDateTime expiredDate = LocalDateTime.now();
         int deletedCount = smartRecommendationRepository.deleteByExpireAtBefore(expiredDate);
         log.info("清理过期推荐记录: 删除数量={}", deletedCount);
     }
@@ -207,22 +215,30 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
         try {
             // 获取行为相似的用户
             List<User> similarUsers = findBehaviorSimilarUsers(targetUser, 10);
+            UserBehaviorStatistics targetStats = userBehaviorStatisticsRepository.findByUser(targetUser).orElse(null);
             
             // 收集相似用户喜欢的内容
             Set<Long> recommendedItemIds = new HashSet<>();
             
             for (User similarUser : similarUsers) {
+                UserBehaviorStatistics similarStats = userBehaviorStatisticsRepository.findByUser(similarUser).orElse(null);
+                double similarity = calculateBehaviorSimilarity(targetUser, targetStats, similarUser, similarStats);
+                if (similarity < 0.25) {
+                    continue;
+                }
+
                 // 获取相似用户最近互动的文件
                 List<FileEntity> similarUserFiles = fileRepository.findByUploader(similarUser, 
                     PageRequest.of(0, 20)).getContent();
                 
                 for (FileEntity file : similarUserFiles) {
-                    if (!recommendedItemIds.contains(file.getId()) && 
-                        !isUserOwnFile(targetUser, file)) {
+                    if (!recommendedItemIds.contains(file.getId()) && isRecommendableFile(targetUser, file)) {
                         
+                        double score = clampScore(0.55 + similarity * 0.3 + calculatePopularityScore(file) * 0.15);
                         SmartRecommendation rec = createRecommendation(
                             targetUser, file.getId(), SmartRecommendation.RecommendationType.FILE,
-                            "基于相似用户喜好推荐", 0.85, SmartRecommendation.SourceType.USER_BEHAVIOR);
+                            "与你行为相似的用户近期关注了该文件", score,
+                            SmartRecommendation.SourceType.USER_BEHAVIOR);
                         recommendations.add(rec);
                         recommendedItemIds.add(file.getId());
                     }
@@ -247,28 +263,36 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
         try {
             // 获取用户最近上传的文件
             List<FileEntity> userFiles = fileRepository.findByUploader(user, 
-                PageRequest.of(0, 10)).getContent();
+                PageRequest.of(0, MAX_RECENT_USER_FILES)).getContent().stream()
+                .filter(this::isAvailableFile)
+                .collect(Collectors.toList());
             
             if (userFiles.isEmpty()) {
                 return recommendations;
             }
             
             // 获取所有文件进行相似性计算
-            List<FileEntity> allFiles = fileRepository.findAll();
+            List<FileEntity> allFiles = fileRepository.findPublicFiles(PageRequest.of(0, MAX_PUBLIC_CANDIDATES))
+                .getContent();
             Set<Long> userFileIds = userFiles.stream()
                 .map(FileEntity::getId)
                 .collect(Collectors.toSet());
             
             Map<FileEntity, Double> similarityScores = new HashMap<>();
+            Map<FileEntity, FileEntity> bestAnchor = new HashMap<>();
+            Map<Long, Set<String>> tagCache = buildTagCache(userFiles, allFiles);
             
             for (FileEntity userFile : userFiles) {
                 for (FileEntity candidateFile : allFiles) {
-                    if (!userFileIds.contains(candidateFile.getId()) && 
-                        !isUserOwnFile(user, candidateFile)) {
+                    if (!userFileIds.contains(candidateFile.getId()) && isRecommendableFile(user, candidateFile)) {
                         
-                        double similarity = calculateFileSimilarity(userFile, candidateFile);
+                        double similarity = calculateFileSimilarity(userFile, candidateFile, tagCache);
                         if (similarity > SIMILARITY_THRESHOLD) {
                             similarityScores.merge(candidateFile, similarity, Math::max);
+                            if (!bestAnchor.containsKey(candidateFile) ||
+                                similarity > similarityScores.getOrDefault(candidateFile, 0.0)) {
+                                bestAnchor.put(candidateFile, userFile);
+                            }
                         }
                     }
                 }
@@ -279,9 +303,12 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
                 .sorted(Map.Entry.<FileEntity, Double>comparingByValue().reversed())
                 .limit(10)
                 .forEach(entry -> {
+                    FileEntity anchor = bestAnchor.get(entry.getKey());
+                    double score = clampScore(entry.getValue() * 0.75 + calculatePopularityScore(entry.getKey()) * 0.25);
                     SmartRecommendation rec = createRecommendation(
                         user, entry.getKey().getId(), SmartRecommendation.RecommendationType.FILE,
-                        "基于内容相似性推荐", entry.getValue(), SmartRecommendation.SourceType.CONTENT_SIMILARITY);
+                        buildSimilarityReason(anchor, entry.getKey()), score,
+                        SmartRecommendation.SourceType.CONTENT_SIMILARITY);
                     recommendations.add(rec);
                 });
             
@@ -301,20 +328,23 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
         List<SmartRecommendation> recommendations = new ArrayList<>();
         
         try {
-            // 获取最近热门文件（按下载次数和分享次数排序）
-            LocalDateTime recentPeriod = LocalDateTime.now().minusDays(30);
-            Page<FileEntity> trendingFiles = fileRepository.findPublicFiles(PageRequest.of(0, 15));
-            
-            int rank = 1;
-            for (FileEntity file : trendingFiles.getContent()) {
-                if (!isUserOwnFile(user, file)) {
-                    double score = Math.max(0.7, 1.0 - (rank * 0.05)); // 排名衰减
+            List<FileEntity> trendingFiles = fileRepository.findPublicFiles(PageRequest.of(0, MAX_PUBLIC_CANDIDATES))
+                .getContent().stream()
+                .filter(file -> isRecommendableFile(user, file))
+                .sorted(Comparator.comparing(this::calculatePopularityScore).reversed())
+                .limit(12)
+                .collect(Collectors.toList());
+
+            int rank = 0;
+            for (FileEntity file : trendingFiles) {
+                double popularity = calculatePopularityScore(file);
+                double rankPenalty = Math.max(0.0, 1.0 - rank * 0.04);
+                double score = clampScore(0.55 + popularity * 0.3 + rankPenalty * 0.15);
                     SmartRecommendation rec = createRecommendation(
                         user, file.getId(), SmartRecommendation.RecommendationType.FILE,
-                        "热门文件推荐", score, SmartRecommendation.SourceType.USER_BEHAVIOR);
+                        buildTrendingReason(file), score, SmartRecommendation.SourceType.USER_BEHAVIOR);
                     recommendations.add(rec);
-                    rank++;
-                }
+                rank++;
             }
             
             log.debug("热门趋势推荐生成: 用户={}, 推荐数量={}", user.getUsername(), recommendations.size());
@@ -334,23 +364,45 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
         
         try {
             // 获取用户常用标签
-            List<String> userTags = getUserFavoriteTags(user, 5);
+            List<String> userTags = getUserFavoriteTags(user, 6);
             
             if (!userTags.isEmpty()) {
+                Map<String, Double> tagWeights = new LinkedHashMap<>();
+                for (int i = 0; i < userTags.size(); i++) {
+                    tagWeights.put(userTags.get(i), 1.0 - i * 0.1);
+                }
+
+                Map<Long, Double> itemScore = new HashMap<>();
+                Map<Long, String> reasonTag = new HashMap<>();
+
                 // 根据标签查找相关文件
                 for (String tagName : userTags) {
                     List<FileEntity> taggedFiles = findFilesByTag(tagName, 5);
                     
                     for (FileEntity file : taggedFiles) {
-                        if (!isUserOwnFile(user, file)) {
-                            SmartRecommendation rec = createRecommendation(
-                                user, file.getId(), SmartRecommendation.RecommendationType.FILE,
-                                "基于标签'" + tagName + "'的相关推荐", 0.75, 
-                                SmartRecommendation.SourceType.CONTENT_SIMILARITY);
-                            recommendations.add(rec);
+                        if (isRecommendableFile(user, file)) {
+                            double increment = clampScore(tagWeights.getOrDefault(tagName, 0.5) * 0.5 +
+                                calculatePopularityScore(file) * 0.5);
+                            itemScore.merge(file.getId(), increment, Math::max);
+                            reasonTag.putIfAbsent(file.getId(), tagName);
                         }
                     }
                 }
+
+                itemScore.entrySet().stream()
+                    .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                    .limit(10)
+                    .forEach(entry -> {
+                        SmartRecommendation rec = createRecommendation(
+                            user,
+                            entry.getKey(),
+                            SmartRecommendation.RecommendationType.FILE,
+                            "与你常用标签'" + reasonTag.get(entry.getKey()) + "'相关",
+                            clampScore(entry.getValue()),
+                            SmartRecommendation.SourceType.CONTENT_SIMILARITY
+                        );
+                        recommendations.add(rec);
+                    });
             }
             
             log.debug("标签基础推荐生成: 用户={}, 推荐数量={}", user.getUsername(), recommendations.size());
@@ -401,51 +453,113 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
     // ==================== 辅助方法 ====================
     
     private List<User> findBehaviorSimilarUsers(User targetUser, int limit) {
-        // 简化实现：返回随机用户作为示例
-        // 实际应用中应基于用户行为向量计算余弦相似度
+        UserBehaviorStatistics targetStats = userBehaviorStatisticsRepository.findByUser(targetUser).orElse(null);
+
         return userRepository.findAll().stream()
-            .filter(user -> !user.getId().equals(targetUser.getId()))
+            .filter(user -> !Objects.equals(user.getId(), targetUser.getId()))
+            .map(user -> new AbstractMap.SimpleEntry<>(
+                user,
+                calculateBehaviorSimilarity(
+                    targetUser,
+                    targetStats,
+                    user,
+                    userBehaviorStatisticsRepository.findByUser(user).orElse(null)
+                )
+            ))
+            .filter(entry -> entry.getValue() >= 0.25)
+            .sorted(Map.Entry.<User, Double>comparingByValue().reversed())
             .limit(limit)
+            .map(Map.Entry::getKey)
             .collect(Collectors.toList());
     }
     
     private boolean isUserOwnFile(User user, FileEntity file) {
-        return file.getUploader().getId().equals(user.getId());
+        return file != null && file.getUploader() != null && Objects.equals(file.getUploader().getId(), user.getId());
     }
     
-    private double calculateFileSimilarity(FileEntity file1, FileEntity file2) {
+    private double calculateFileSimilarity(FileEntity file1, FileEntity file2, Map<Long, Set<String>> tagCache) {
         double similarity = 0.0;
         
         // 扩展名相似度
-        if (file1.getExtension().equalsIgnoreCase(file2.getExtension())) {
-            similarity += 0.4;
+        if (Objects.equals(normalize(file1.getExtension()), normalize(file2.getExtension()))) {
+            similarity += 0.35;
+        }
+
+        // MIME 主类型相似度
+        String type1 = extractMimePrimaryType(file1.getContentType());
+        String type2 = extractMimePrimaryType(file2.getContentType());
+        if (!type1.isEmpty() && type1.equals(type2)) {
+            similarity += 0.15;
+        }
+
+        // 文件大小相似度
+        long size1 = nullSafeLong(file1.getFileSize());
+        long size2 = nullSafeLong(file2.getFileSize());
+        if (size1 > 0 && size2 > 0) {
+            double sizeRatio = Math.min(size1, size2) * 1.0 / Math.max(size1, size2);
+            similarity += sizeRatio * 0.2;
         }
         
-        // 文件大小相似度
-        double sizeRatio = Math.min(file1.getFileSize(), file2.getFileSize()) * 1.0 / 
-                          Math.max(file1.getFileSize(), file2.getFileSize());
-        similarity += sizeRatio * 0.3;
-        
         // 标签相似度
-        List<String> commonTags = findCommonTags(file1, file2);
-        similarity += Math.min(commonTags.size() * 0.1, 0.3);
+        Set<String> tags1 = tagCache.getOrDefault(file1.getId(), Collections.emptySet());
+        Set<String> tags2 = tagCache.getOrDefault(file2.getId(), Collections.emptySet());
+        similarity += calculateSetSimilarity(tags1, tags2) * 0.2;
+
+        // 新旧程度相似度
+        similarity += calculateRecencySimilarity(file1.getCreatedAt(), file2.getCreatedAt()) * 0.1;
         
-        return Math.min(similarity, 1.0);
+        return clampScore(similarity);
     }
     
     private List<String> findCommonTags(FileEntity file1, FileEntity file2) {
-        // 简化实现
-        return Arrays.asList("important", "document");
+        Set<String> tags1 = fileTagRepository.findTagNamesByFile(file1).stream()
+            .map(this::normalize)
+            .filter(tag -> !tag.isEmpty())
+            .collect(Collectors.toSet());
+        Set<String> tags2 = fileTagRepository.findTagNamesByFile(file2).stream()
+            .map(this::normalize)
+            .filter(tag -> !tag.isEmpty())
+            .collect(Collectors.toSet());
+
+        return tags1.stream().filter(tags2::contains).collect(Collectors.toList());
     }
     
     private List<String> getUserFavoriteTags(User user, int limit) {
-        // 简化实现：返回常用标签
-        return Arrays.asList("work", "study", "personal");
+        List<FileEntity> userFiles = fileRepository.findByUploader(user, PageRequest.of(0, MAX_RECENT_USER_FILES))
+            .getContent();
+
+        if (userFiles.isEmpty()) {
+            return tagRepository.findPopularTags(user, PageRequest.of(0, limit)).getContent().stream()
+                .map(Tag::getTagName)
+                .filter(Objects::nonNull)
+                .limit(limit)
+                .collect(Collectors.toList());
+        }
+
+        Map<String, Long> usage = new HashMap<>();
+        for (FileEntity file : userFiles) {
+            for (String tag : fileTagRepository.findTagNamesByFile(file)) {
+                String normalizedTag = normalize(tag);
+                if (!normalizedTag.isEmpty()) {
+                    usage.merge(normalizedTag, 1L, Long::sum);
+                }
+            }
+        }
+
+        return usage.entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .limit(limit)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
     }
     
     private List<FileEntity> findFilesByTag(String tagName, int limit) {
-        // 简化实现：返回示例文件
-        return fileRepository.findAll().stream().limit(limit).collect(Collectors.toList());
+        return tagRepository.findByTagName(tagName)
+            .map(tag -> fileTagRepository.findFilesByTag(tag).stream()
+                .filter(this::isAvailableFile)
+                .limit(limit)
+                .collect(Collectors.toList()))
+            .orElseGet(Collections::emptyList);
     }
     
     private SmartRecommendation createRecommendation(User user, Long itemId, 
@@ -482,33 +596,344 @@ public class SmartRecommendationServiceImpl implements SmartRecommendationServic
     }
     
     private List<SmartRecommendation> getSimilarFiles(Long fileId, User user) {
-        // 实现相似文件推荐逻辑
-        return new ArrayList<>();
+        Optional<FileEntity> baseFileOpt = fileRepository.findById(fileId);
+        if (baseFileOpt.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        FileEntity baseFile = baseFileOpt.get();
+        List<FileEntity> candidates = fileRepository.findPublicFiles(PageRequest.of(0, MAX_PUBLIC_CANDIDATES))
+            .getContent();
+
+        Map<Long, Set<String>> tagCache = buildTagCache(Collections.singletonList(baseFile), candidates);
+
+        return candidates.stream()
+            .filter(file -> !Objects.equals(file.getId(), baseFile.getId()))
+            .filter(file -> isRecommendableFile(user, file))
+            .map(file -> new AbstractMap.SimpleEntry<>(file, calculateFileSimilarity(baseFile, file, tagCache)))
+            .filter(entry -> entry.getValue() > SIMILARITY_THRESHOLD)
+            .sorted(Map.Entry.<FileEntity, Double>comparingByValue().reversed())
+            .limit(10)
+            .map(entry -> createRecommendation(
+                user,
+                entry.getKey().getId(),
+                SmartRecommendation.RecommendationType.FILE,
+                buildSimilarityReason(baseFile, entry.getKey()),
+                clampScore(entry.getValue() * 0.8 + calculatePopularityScore(entry.getKey()) * 0.2),
+                SmartRecommendation.SourceType.CONTENT_SIMILARITY
+            ))
+            .collect(Collectors.toList());
     }
     
     private List<SmartRecommendation> getSimilarFolders(Long folderId, User user) {
-        // 实现相似文件夹推荐逻辑
-        return new ArrayList<>();
+        Optional<Folder> baseFolderOpt = folderRepository.findById(folderId);
+        List<Folder> publicFolders = folderRepository.findPublicFolders().stream()
+            .filter(folder -> folder.getOwner() != null && !Objects.equals(folder.getOwner().getId(), user.getId()))
+            .collect(Collectors.toList());
+
+        if (publicFolders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return publicFolders.stream()
+            .map(folder -> {
+                double score;
+                String reason;
+
+                if (baseFolderOpt.isPresent()) {
+                    Folder baseFolder = baseFolderOpt.get();
+                    Set<String> baseTokens = tokenizeName(baseFolder.getName());
+                    Set<String> candidateTokens = tokenizeName(folder.getName());
+                    double nameSimilarity = calculateSetSimilarity(baseTokens, candidateTokens);
+                    double recency = calculateRecencyScore(folder.getCreatedAt());
+                    score = clampScore(nameSimilarity * 0.7 + recency * 0.3);
+                    reason = "与当前文件夹命名风格相近";
+                } else {
+                    score = clampScore(0.5 + calculateRecencyScore(folder.getCreatedAt()) * 0.5);
+                    reason = "公开且近期活跃的共享文件夹";
+                }
+
+                return createRecommendation(
+                    user,
+                    folder.getId(),
+                    SmartRecommendation.RecommendationType.FOLDER,
+                    reason,
+                    score,
+                    SmartRecommendation.SourceType.CONTENT_SIMILARITY
+                );
+            })
+            .filter(rec -> rec.getRelevanceScore() >= 0.35)
+            .sorted(Comparator.comparing(SmartRecommendation::getRelevanceScore).reversed())
+            .limit(8)
+            .collect(Collectors.toList());
     }
     
     private List<SmartRecommendation> getRelatedTags(Long tagId, User user) {
-        // 实现相关标签推荐逻辑
-        return new ArrayList<>();
+        Optional<Tag> baseTagOpt = tagRepository.findById(tagId);
+        if (baseTagOpt.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Tag baseTag = baseTagOpt.get();
+        List<FileEntity> relatedFiles = fileTagRepository.findFilesByTag(baseTag);
+        if (relatedFiles.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Tag, Long> coOccurrence = new HashMap<>();
+        for (FileEntity file : relatedFiles) {
+            for (Tag tag : fileTagRepository.findTagsByFile(file)) {
+                if (!Objects.equals(tag.getId(), baseTag.getId())) {
+                    coOccurrence.merge(tag, 1L, Long::sum);
+                }
+            }
+        }
+
+        long total = relatedFiles.size();
+        return coOccurrence.entrySet().stream()
+            .sorted(Map.Entry.<Tag, Long>comparingByValue().reversed())
+            .limit(8)
+            .map(entry -> createRecommendation(
+                user,
+                entry.getKey().getId(),
+                SmartRecommendation.RecommendationType.TAG,
+                "与标签'" + baseTag.getTagName() + "'经常共同出现",
+                clampScore(entry.getValue() * 1.0 / total),
+                SmartRecommendation.SourceType.CONTENT_SIMILARITY
+            ))
+            .collect(Collectors.toList());
     }
     
     private List<SmartRecommendation> getWorkRelatedRecommendations(User user) {
-        return new ArrayList<>();
+        return recommendByExtensionSet(
+            user,
+            new HashSet<>(Arrays.asList("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx")),
+            "工作时段常用文档类型"
+        );
     }
     
     private List<SmartRecommendation> getStudyRelatedRecommendations(User user) {
-        return new ArrayList<>();
+        return recommendByExtensionSet(
+            user,
+            new HashSet<>(Arrays.asList("md", "txt", "java", "py", "js", "ts", "sql")),
+            "学习/项目时段常用资料类型"
+        );
     }
     
     private List<SmartRecommendation> getEntertainmentRecommendations(User user) {
-        return new ArrayList<>();
+        return recommendByExtensionSet(
+            user,
+            new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "mp3", "wav", "mp4", "mov")),
+            "晚间偏好的娱乐内容"
+        );
     }
     
     private List<SmartRecommendation> getWeekendRecommendations(User user) {
-        return new ArrayList<>();
+        return recommendByExtensionSet(
+            user,
+            new HashSet<>(Arrays.asList("zip", "rar", "7z", "mp4", "pdf", "md")),
+            "周末常用内容类型"
+        );
+    }
+
+    private List<SmartRecommendation> recommendByExtensionSet(User user, Set<String> preferredExtensions, String reasonPrefix) {
+        if (preferredExtensions.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return fileRepository.findPublicFiles(PageRequest.of(0, MAX_PUBLIC_CANDIDATES)).getContent().stream()
+            .filter(file -> isRecommendableFile(user, file))
+            .filter(file -> preferredExtensions.contains(normalize(file.getExtension())))
+            .sorted(Comparator.comparing(this::calculatePopularityScore).reversed())
+            .limit(6)
+            .map(file -> createRecommendation(
+                user,
+                file.getId(),
+                SmartRecommendation.RecommendationType.FILE,
+                reasonPrefix + "（." + normalize(file.getExtension()) + "）",
+                clampScore(0.45 + calculatePopularityScore(file) * 0.35 + calculateRecencyScore(file.getCreatedAt()) * 0.2),
+                SmartRecommendation.SourceType.AI_MODEL
+            ))
+            .collect(Collectors.toList());
+    }
+
+    private boolean isRecommendableFile(User user, FileEntity file) {
+        return file != null
+            && file.getId() != null
+            && isAvailableFile(file)
+            && Boolean.TRUE.equals(file.getIsPublic())
+            && !isUserOwnFile(user, file);
+    }
+
+    private boolean isAvailableFile(FileEntity file) {
+        return file != null && FileEntity.FileStatus.AVAILABLE.equals(file.getStatus());
+    }
+
+    private double calculatePopularityScore(FileEntity file) {
+        double download = Math.min(1.0, nullSafeInt(file.getDownloadCount()) / 50.0);
+        double preview = Math.min(1.0, nullSafeInt(file.getPreviewCount()) / 100.0);
+        double share = Math.min(1.0, nullSafeInt(file.getShareCount()) / 20.0);
+        double activity = download * 0.5 + preview * 0.2 + share * 0.3;
+
+        long ageDays = Math.max(0, ChronoUnit.DAYS.between(
+            Optional.ofNullable(file.getCreatedAt()).orElse(LocalDateTime.now()),
+            LocalDateTime.now()
+        ));
+        double decay = Math.pow(DECAY_FACTOR, ageDays / 7.0);
+        return clampScore(activity * decay + 0.1);
+    }
+
+    private String buildTrendingReason(FileEntity file) {
+        return "近期热度较高（下载" + nullSafeInt(file.getDownloadCount()) +
+            "、预览" + nullSafeInt(file.getPreviewCount()) +
+            "、分享" + nullSafeInt(file.getShareCount()) + "）";
+    }
+
+    private String buildSimilarityReason(FileEntity anchor, FileEntity candidate) {
+        if (anchor == null || candidate == null) {
+            return "与您的历史内容偏好相似";
+        }
+
+        String anchorExt = normalize(anchor.getExtension());
+        String candidateExt = normalize(candidate.getExtension());
+        if (!anchorExt.isEmpty() && anchorExt.equals(candidateExt)) {
+            return "与您近期文件类型一致（." + anchorExt + "）";
+        }
+
+        List<String> common = findCommonTags(anchor, candidate);
+        if (!common.isEmpty()) {
+            return "与您内容标签相近（" + common.get(0) + "）";
+        }
+
+        return "与您近期访问内容在格式和体量上相似";
+    }
+
+    private Map<Long, Set<String>> buildTagCache(List<FileEntity> sourceFiles, List<FileEntity> candidateFiles) {
+        Map<Long, Set<String>> cache = new HashMap<>();
+        List<FileEntity> allFiles = new ArrayList<>();
+        allFiles.addAll(sourceFiles);
+        allFiles.addAll(candidateFiles);
+
+        for (FileEntity file : allFiles) {
+            if (file == null || file.getId() == null || cache.containsKey(file.getId())) {
+                continue;
+            }
+            Set<String> tags = fileTagRepository.findTagNamesByFile(file).stream()
+                .map(this::normalize)
+                .filter(tag -> !tag.isEmpty())
+                .collect(Collectors.toSet());
+            cache.put(file.getId(), tags);
+        }
+
+        return cache;
+    }
+
+    private double calculateBehaviorSimilarity(User targetUser,
+                                               UserBehaviorStatistics targetStats,
+                                               User candidateUser,
+                                               UserBehaviorStatistics candidateStats) {
+        double statsSimilarity = calculateStatsSimilarity(targetStats, candidateStats);
+        double fileTypeSimilarity = calculateUserFileTypeSimilarity(targetUser, candidateUser);
+        return clampScore(statsSimilarity * 0.65 + fileTypeSimilarity * 0.35);
+    }
+
+    private double calculateStatsSimilarity(UserBehaviorStatistics left, UserBehaviorStatistics right) {
+        if (left == null || right == null) {
+            return 0.0;
+        }
+
+        double uploads = normalizedDistanceSimilarity(left.getTotalUploads(), right.getTotalUploads());
+        double downloads = normalizedDistanceSimilarity(left.getTotalDownloads(), right.getTotalDownloads());
+        double previews = normalizedDistanceSimilarity(left.getTotalPreviews(), right.getTotalPreviews());
+        double shares = normalizedDistanceSimilarity(left.getTotalShares(), right.getTotalShares());
+        double fileSize = normalizedDistanceSimilarity(left.getAverageFileSize(), right.getAverageFileSize());
+
+        double favoriteType = Objects.equals(normalize(left.getFavoriteFileType()), normalize(right.getFavoriteFileType()))
+            ? 1.0 : 0.0;
+
+        return clampScore(uploads * 0.2 + downloads * 0.2 + previews * 0.2 + shares * 0.15 + fileSize * 0.15 + favoriteType * 0.1);
+    }
+
+    private double calculateUserFileTypeSimilarity(User user1, User user2) {
+        Map<String, Long> user1Types = getUserFileTypeProfile(user1);
+        Map<String, Long> user2Types = getUserFileTypeProfile(user2);
+        return calculateSetSimilarity(user1Types.keySet(), user2Types.keySet());
+    }
+
+    private Map<String, Long> getUserFileTypeProfile(User user) {
+        return fileRepository.findByUploader(user, PageRequest.of(0, MAX_RECENT_USER_FILES)).getContent().stream()
+            .map(FileEntity::getExtension)
+            .map(this::normalize)
+            .filter(ext -> !ext.isEmpty())
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    }
+
+    private double calculateSetSimilarity(Set<String> left, Set<String> right) {
+        if (left == null || right == null || left.isEmpty() || right.isEmpty()) {
+            return 0.0;
+        }
+        Set<String> union = new HashSet<>(left);
+        union.addAll(right);
+        Set<String> intersection = new HashSet<>(left);
+        intersection.retainAll(right);
+        return union.isEmpty() ? 0.0 : intersection.size() * 1.0 / union.size();
+    }
+
+    private double calculateRecencyScore(LocalDateTime createdAt) {
+        if (createdAt == null) {
+            return 0.0;
+        }
+        long days = Math.max(0, ChronoUnit.DAYS.between(createdAt, LocalDateTime.now()));
+        return clampScore(Math.pow(DECAY_FACTOR, days / 3.0));
+    }
+
+    private double calculateRecencySimilarity(LocalDateTime left, LocalDateTime right) {
+        if (left == null || right == null) {
+            return 0.0;
+        }
+        long dayDiff = Math.abs(ChronoUnit.DAYS.between(left, right));
+        return clampScore(1.0 / (1.0 + dayDiff / 7.0));
+    }
+
+    private double normalizedDistanceSimilarity(Long left, Long right) {
+        long leftValue = nullSafeLong(left);
+        long rightValue = nullSafeLong(right);
+        long max = Math.max(leftValue, rightValue);
+        if (max == 0L) {
+            return 1.0;
+        }
+        return clampScore(1.0 - Math.abs(leftValue - rightValue) * 1.0 / max);
+    }
+
+    private int nullSafeInt(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private long nullSafeLong(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private double clampScore(double score) {
+        return Math.max(0.0, Math.min(1.0, score));
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String extractMimePrimaryType(String contentType) {
+        if (contentType == null || !contentType.contains("/")) {
+            return "";
+        }
+        return normalize(contentType.substring(0, contentType.indexOf('/')));
+    }
+
+    private Set<String> tokenizeName(String name) {
+        if (name == null || name.isBlank()) {
+            return Collections.emptySet();
+        }
+        return Arrays.stream(name.toLowerCase(Locale.ROOT).split("[^a-z0-9\\u4e00-\\u9fa5]+"))
+            .filter(token -> !token.isBlank())
+            .collect(Collectors.toSet());
     }
 }

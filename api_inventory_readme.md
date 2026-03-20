@@ -3,8 +3,8 @@
 > 扫描来源：`src/main/java/**` 控制器与上传控制器注解。
 > 联调方式：后端直连 `http://localhost:8080` 与前端代理 `http://localhost:3001` 双通道冒烟。
 
-- 本次扫描接口总数：104
-- 双通道可达接口：104/104
+- 本次扫描接口总数：65
+- 双通道可达接口：65/65
 
 | Method | Path | Controller | BackendStatus | ProxyStatus |
 |---|---|---|---:|---:|
@@ -12,12 +12,8 @@
 | DELETE | /api/backup/cleanup | BackupController | 403 | 403 |
 | DELETE | /api/cloud-storage/configs/{configId} | CloudStorageController | 403 | 403 |
 | DELETE | /api/files/{fileId} | FileController | 403 | 403 |
-| DELETE | /api/mobile/files/{fileId}/favorite | MobileFileController | 403 | 403 |
 | DELETE | /api/monitoring/cleanup | MonitoringController | 403 | 403 |
 | DELETE | /api/recommendations/cleanup | RecommendationController | 403 | 403 |
-| GET | /api/ai/analyze-behavior | AIController | 403 | 403 |
-| GET | /api/ai/models | AIController | 403 | 403 |
-| GET | /api/ai/smart-search | AIController | 403 | 403 |
 | GET | /api/auth/me | AuthController | 401 | 401 |
 | GET | /api/backup/config/export | BackupController | 403 | 403 |
 | GET | /api/backup/list | BackupController | 403 | 403 |
@@ -35,22 +31,6 @@
 | GET | /api/files/{fileId}/download | FileController | 403 | 403 |
 | GET | /api/files/my | FileController | 403 | 403 |
 | GET | /api/files/public | FileController | 200 | 200 |
-| GET | /api/mobile/enhanced/activity/recent | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/announcements | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/config | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/files/{fileId}/preview-info | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/files/{fileId}/thumbnail-info | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/storage/usage | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/version/check | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/files/favorites | MobileFileController | 403 | 403 |
-| GET | /api/mobile/files/offline-available | MobileFileController | 403 | 403 |
-| GET | /api/mobile/files/recent | MobileFileController | 403 | 403 |
-| GET | /api/mobile/files/search | MobileFileController | 403 | 403 |
-| GET | /api/mobile/folders | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/folders/{folderId}/breadcrumb | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/folders/{folderId}/subfolders | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/folders/quick-access | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/upload/progress/{uploadId} | MobileUploadController | 403 | 403 |
 | GET | /api/monitoring/alerts | MonitoringController | 403 | 403 |
 | GET | /api/monitoring/health | MonitoringController | 403 | 403 |
 | GET | /api/monitoring/metrics | MonitoringController | 403 | 403 |
@@ -69,18 +49,6 @@
 | GET | /api/recommendations/analytics | RecommendationController | 403 | 403 |
 | GET | /api/recommendations/similar/{itemId} | RecommendationController | 403 | 403 |
 | GET | /api/users/profile | UserController | 403 | 403 |
-| POST | /api/ai/analyze-file | AIController | 403 | 403 |
-| POST | /api/ai/classify-text | AIController | 403 | 403 |
-| POST | /api/ai/document-summary | AIController | 403 | 403 |
-| POST | /api/ai/keywords | AIController | 403 | 403 |
-| POST | /api/ai/question-answer | AIController | 403 | 403 |
-| POST | /api/ai/recognize-image | AIController | 403 | 403 |
-| POST | /api/ai/recommend-tags | AIController | 403 | 403 |
-| POST | /api/ai/sentiment | AIController | 403 | 403 |
-| POST | /api/ai/similarity | AIController | 403 | 403 |
-| POST | /api/ai/summarize | AIController | 403 | 403 |
-| POST | /api/ai/test-model/{modelId} | AIController | 403 | 403 |
-| POST | /api/ai/text-correction | AIController | 403 | 403 |
 | POST | /api/auth/debug-login | AuthController | 400 | 400 |
 | POST | /api/auth/login | AuthController | 400 | 400 |
 | POST | /api/auth/register | AuthController | 400 | 400 |
@@ -94,13 +62,6 @@
 | POST | /api/cloud-storage/configs/{configId}/test-connection | CloudStorageController | 403 | 403 |
 | POST | /api/demo/register | DemoController | 403 | 403 |
 | POST | /api/files/upload | FileController | 403 | 403 |
-| POST | /api/mobile/enhanced/feedback | MobileEnhancedController | 403 | 403 |
-| POST | /api/mobile/enhanced/files/batch-operate | MobileEnhancedController | 403 | 403 |
-| POST | /api/mobile/enhanced/sync | MobileEnhancedController | 403 | 403 |
-| POST | /api/mobile/files/{fileId}/favorite | MobileFileController | 403 | 403 |
-| POST | /api/mobile/upload | MobileUploadController | 403 | 403 |
-| POST | /api/mobile/upload/chunk | MobileUploadController | 403 | 403 |
-| POST | /api/mobile/upload/init-chunk | MobileUploadController | 403 | 403 |
 | POST | /api/monitoring/alerts/test | MonitoringController | 403 | 403 |
 | POST | /api/recommendations/generate | RecommendationController | 403 | 403 |
 | POST | /api/upload/chunk | ChunkUploadController | 403 | 403 |

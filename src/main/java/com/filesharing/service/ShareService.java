@@ -7,6 +7,7 @@ import com.filesharing.entity.ShareRecord;
 import com.filesharing.entity.User;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 分享服务接口
@@ -27,6 +28,16 @@ public interface ShareService {
      * 获取公开分享信息（不增加访问次数）
      */
     ShareResponse getPublicShareInfo(String shareKey);
+
+    /**
+     * 获取公开分享信息并记录短链点击
+     */
+    ShareResponse getPublicShareInfoWithTracking(String shareKey, String ipAddress, String address, String userAgent, String referer);
+
+    /**
+     * 获取分享监控详情
+     */
+    Map<String, Object> getShareMonitoringDetails(Long shareId, User currentUser, int limit);
     
     /**
      * 获取用户的分享记录

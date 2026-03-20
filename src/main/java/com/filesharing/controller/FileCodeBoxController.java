@@ -13,8 +13,10 @@ import com.filesharing.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -23,11 +25,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * FileCodeBox 兼容接口控制器。
+ * 快传中心公共接口控制器。
  */
 @Slf4j
 @RestController
@@ -114,9 +117,7 @@ public class FileCodeBoxController {
                                                                            @RequestParam("file") MultipartFile file,
                                                                            HttpServletRequest request) throws Exception {
         Long uploaderId = resolveUploaderId(request);
-        if (uploaderId == null && !fileCodeBoxProperties.isOpenUpload()) {
-            throw new BusinessException("AUTH_REQUIRED", "未开启游客上传，请先登录管理员账号");
-        }
+        ensureUploadAllowed(uploaderId);
 
         Map<String, Object> detail = fileCodeBoxService.uploadPresignProxy(uploadId, file, resolveClientIp(request));
         return ResponseEntity.ok(ApiResponse.success(detail));
@@ -127,9 +128,7 @@ public class FileCodeBoxController {
                                                                                   @RequestBody(required = false) PresignUploadConfirmRequest body,
                                                                                   HttpServletRequest request) {
         Long uploaderId = resolveUploaderId(request);
-        if (uploaderId == null && !fileCodeBoxProperties.isOpenUpload()) {
-            throw new BusinessException("AUTH_REQUIRED", "未开启游客上传，请先登录管理员账号");
-        }
+        ensureUploadAllowed(uploaderId);
 
         Integer expireValue = body == null ? null : body.getExpireValue();
         String expireStyle = body == null ? null : body.getExpireStyle();
@@ -171,15 +170,43 @@ public class FileCodeBoxController {
                     .body(ApiResponse.error("FILE_NOT_FOUND", "文件已过期删除或不存在"));
         }
 
-        String contentType = record.getContentType();
-        if (contentType == null || contentType.isBlank()) {
-            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
-        }
+        MediaType mediaType = resolveMediaType(record.getContentType());
+        String fileName = resolveDownloadFileName(record);
+        String contentDisposition = ContentDisposition.attachment()
+                .filename(fileName, StandardCharsets.UTF_8)
+                .build()
+                .toString();
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + record.getDisplayName() + "\"")
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
                 .body(resource);
+    }
+
+    private void ensureUploadAllowed(Long uploaderId) {
+        if (uploaderId == null && !fileCodeBoxProperties.isOpenUpload()) {
+            throw new BusinessException("AUTH_REQUIRED", "未开启游客上传，请先登录管理员账号");
+        }
+    }
+
+    private MediaType resolveMediaType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        try {
+            return MediaType.parseMediaType(contentType);
+        } catch (InvalidMediaTypeException ex) {
+            log.warn("FileCodeBox记录存在非法contentType: {}, fallback为application/octet-stream", contentType);
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+    }
+
+    private String resolveDownloadFileName(PickupCodeRecord record) {
+        String displayName = record.getDisplayName();
+        if (displayName == null || displayName.isBlank()) {
+            return "download.bin";
+        }
+        return displayName.replace("\r", "_").replace("\n", "_");
     }
 
     private Long resolveUploaderId(HttpServletRequest request) {

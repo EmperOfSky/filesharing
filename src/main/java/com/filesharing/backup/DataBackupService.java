@@ -7,12 +7,12 @@ import com.filesharing.entity.User;
 import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.FileRepository;
 import com.filesharing.repository.UserRepository;
+import com.filesharing.util.FileStorageUtil;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +41,7 @@ public class DataBackupService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final BackupTaskRepository backupTaskRepository;
+    private final FileStorageUtil fileStorageUtil;
     
     // 备份配置（从 application.yml 注入）
     @Value("${backup.base-path:./backups}")
@@ -569,7 +570,8 @@ public class DataBackupService {
             List<BackupInfo> backups = listBackups();
             
             for (BackupInfo backup : backups) {
-                if (backup.getCreateTime().isBefore(cutoffTime)) {
+                LocalDateTime createTime = backup.getCreateTime();
+                if (createTime != null && createTime.isBefore(cutoffTime)) {
                     try {
                         deleteBackup(backup.getBackupPath());
                         result.getDeletedBackups().add(backup.getBackupName());
@@ -663,45 +665,41 @@ public class DataBackupService {
     private long backupFiles(Path outputFile) throws IOException {
         List<FileEntity> files = fileRepository.findAll();
         long totalSize = 0;
+        long backedUpCount = 0;
 
         try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(outputFile.toFile()))) {
             zipOut.setLevel(compressionLevel);
             byte[] buffer = new byte[8192];
 
             for (FileEntity file : files) {
-                Path storageBaseDir = Paths.get(storageBasePath).toAbsolutePath().normalize();
-                String relative = file.getFilePath() != null ? file.getFilePath().replaceFirst("^[\\/]+", "") : file.getStorageName();
-                Path filePath = storageBaseDir.resolve(relative).normalize();
-                if (!filePath.startsWith(storageBaseDir)) {
-                    log.warn("检测到非法文件路径，跳过备份: {}", filePath);
+                Resource resource = fileStorageUtil.loadAsResource(file.getStorageName(), file.getFilePath());
+                if (resource == null || !resource.exists()) {
+                    log.warn("备份时文件不存在或不可访问: storageName={}, filePath={}", file.getStorageName(), file.getFilePath());
                     continue;
                 }
 
-                if (Files.exists(filePath) && Files.isRegularFile(filePath)) {
-                    ZipEntry zipEntry = new ZipEntry(file.getStorageName());
-                    zipOut.putNextEntry(zipEntry);
+                ZipEntry zipEntry = new ZipEntry(file.getStorageName());
+                zipOut.putNextEntry(zipEntry);
 
-                    try (InputStream in = Files.newInputStream(filePath)) {
-                        int len;
-                        while ((len = in.read(buffer)) != -1) {
-                            zipOut.write(buffer, 0, len);
-                            totalSize += len;
+                try (InputStream in = resource.getInputStream()) {
+                    int len;
+                    while ((len = in.read(buffer)) != -1) {
+                        zipOut.write(buffer, 0, len);
+                        totalSize += len;
 
-                            if (totalSize > maxBackupSize) {
-                                zipOut.closeEntry();
-                                throw new BusinessException("备份文件大小超过限制: " + maxBackupSize);
-                            }
+                        if (totalSize > maxBackupSize) {
+                            zipOut.closeEntry();
+                            throw new BusinessException("备份文件大小超过限制: " + maxBackupSize);
                         }
                     }
-
-                    zipOut.closeEntry();
-                } else {
-                    log.warn("备份时文件不存在或不可访问: {}", filePath);
                 }
+
+                zipOut.closeEntry();
+                backedUpCount++;
             }
         }
 
-        return files.size();
+        return backedUpCount;
     }
     
     private long backupIncrementalFiles(Path outputFile, LocalDateTime sinceTime) throws IOException {
@@ -709,45 +707,41 @@ public class DataBackupService {
         List<FileEntity> files = new ArrayList<>();
         filesIterable.forEach(files::add);
         long totalSize = 0;
+        long backedUpCount = 0;
 
         try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(outputFile.toFile()))) {
             zipOut.setLevel(compressionLevel);
             byte[] buffer = new byte[8192];
 
             for (FileEntity file : files) {
-                Path storageBaseDir = Paths.get(storageBasePath).toAbsolutePath().normalize();
-                String relative = file.getFilePath() != null ? file.getFilePath().replaceFirst("^[\\/]+", "") : file.getStorageName();
-                Path filePath = storageBaseDir.resolve(relative).normalize();
-                if (!filePath.startsWith(storageBaseDir)) {
-                    log.warn("检测到非法文件路径，跳过增量备份: {}", filePath);
+                Resource resource = fileStorageUtil.loadAsResource(file.getStorageName(), file.getFilePath());
+                if (resource == null || !resource.exists()) {
+                    log.warn("备份增量时文件不存在或不可访问: storageName={}, filePath={}", file.getStorageName(), file.getFilePath());
                     continue;
                 }
 
-                if (Files.exists(filePath) && Files.isRegularFile(filePath)) {
-                    ZipEntry zipEntry = new ZipEntry(file.getStorageName());
-                    zipOut.putNextEntry(zipEntry);
+                ZipEntry zipEntry = new ZipEntry(file.getStorageName());
+                zipOut.putNextEntry(zipEntry);
 
-                    try (InputStream in = Files.newInputStream(filePath)) {
-                        int len;
-                        while ((len = in.read(buffer)) != -1) {
-                            zipOut.write(buffer, 0, len);
-                            totalSize += len;
+                try (InputStream in = resource.getInputStream()) {
+                    int len;
+                    while ((len = in.read(buffer)) != -1) {
+                        zipOut.write(buffer, 0, len);
+                        totalSize += len;
 
-                            if (totalSize > maxBackupSize) {
-                                zipOut.closeEntry();
-                                throw new BusinessException("备份文件大小超过限制: " + maxBackupSize);
-                            }
+                        if (totalSize > maxBackupSize) {
+                            zipOut.closeEntry();
+                            throw new BusinessException("备份文件大小超过限制: " + maxBackupSize);
                         }
                     }
-
-                    zipOut.closeEntry();
-                } else {
-                    log.warn("备份增量时文件不存在或不可访问: {}", filePath);
                 }
+
+                zipOut.closeEntry();
+                backedUpCount++;
             }
         }
 
-        return files.size();
+        return backedUpCount;
     }
     
     private BackupMetadata generateBackupMetadata(String backupName, boolean includeFiles) {

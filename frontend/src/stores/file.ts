@@ -66,7 +66,7 @@ export const useFileStore = defineStore('file', () => {
 
   const deleteFile = async (id: number) => {
     try {
-      await fileService.deleteFile(id)
+      await fileService.moveFileToRecycleBin(id)
       files.value = files.value.filter(file => file.id !== id)
     } catch (error) {
       throw error
@@ -85,7 +85,7 @@ export const useFileStore = defineStore('file', () => {
 
   const deleteFolder = async (id: number) => {
     try {
-      await fileService.deleteFolder(id)
+      await fileService.moveFolderToRecycleBin(id)
       folders.value = folders.value.filter(folder => folder.id !== id)
       // 同时删除该文件夹下的文件
       files.value = files.value.filter(file => file.folderId !== id)

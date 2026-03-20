@@ -1,405 +1,221 @@
-# 文件共享系统 (File Sharing System)
+# File Sharing System
 
-一个功能完整的企业级文件共享平台，基于Spring Boot 2.7.5开发，提供文件管理、协作办公、AI智能分析等核心功能。
+一个基于 `Spring Boot 2.7 + Vue 3 + Element Plus` 的文件共享工作台，覆盖认证鉴权、文件管理、短链分享、快传中心、协作项目、回收站、推荐、备份恢复、监控和云存储配置等能力。
 
-## 🌟 系统特性
+当前仓库不是单一后端接口集合，而是一个已经具备完整工作台前端和多业务域后端的全栈项目。
 
-### 🔧 核心功能
-- **文件管理**: 上传、下载、预览、分享、版本控制
-- **文件夹管理**: 层级目录结构、权限控制
-- **用户系统**: 注册登录、权限管理、个人中心
-- **协作办公**: 项目管理、文档协作、实时评论
-- **AI智能**: 内容分类、图像识别、智能推荐
-- **移动端优化**: 专为移动设备设计的API接口
+## 项目概览
 
-### 🛡️ 安全特性
-- JWT Token认证
-- 细粒度权限控制
-- 数据加密存储
-- 操作日志记录
-- XSS/CSRF防护
+| 维度 | 当前实现 |
+| --- | --- |
+| 后端框架 | Spring Boot 2.7.5, Spring Security, Spring Data JPA, WebSocket |
+| 前端框架 | Vue 3, Vite 5, TypeScript, Pinia, Vue Router, Element Plus |
+| JDK | 17 |
+| 数据库 | MySQL 8 |
+| 默认后端端口 | `8443` HTTPS, `8080` HTTP 重定向 |
+| 默认前端端口 | `3000` |
+| 前端页面数 | 19 个 Vue 页面 |
+| 主控制器数 | 18 个主控制器 + 1 个上传控制器 |
+| 已扫描接口数 | 65 |
+| 默认存储后端 | 本地存储 `storage.type=local` |
 
-### 📊 系统监控
-- 实时性能监控
-- 用户行为分析
-- 文件使用统计
-- 系统健康检查
+## 这套系统现在能做什么
 
-## 🚀 快速开始
+### 1. 文件工作台
 
-### 环境要求
-- Java 17+
-- Maven 3.6+
-- 内存 2GB+
+- 用户注册、登录、JWT 鉴权
+- 文件上传、下载、预览、重命名、移动、复制、收藏
+- 文件夹创建、浏览、重命名、删除
+- 分片上传、断点续传、上传校验
+- 公开文件接口和用户个人文件统计
 
-### 启动步骤
+### 2. 快传中心
 
-1. **克隆项目**
-```bash
-git clone <项目地址>
-cd filesharing
+- 文本快传
+- 文件快传
+- 预签名直传
+- 取件码提取与下载授权
+- 快传配置管理
+- 快传记录审计与导出
+- 兼容旧版 `/api/share/*`、`/api/admin/*` 风格接口
+
+### 3. 分享与外链访问
+
+- 创建短链分享
+- 分享密码访问
+- 一次性下载令牌
+- 我的分享列表、启用、停用、删除
+- 公共访问页 `/s/:shareKey`
+
+### 4. 检索、推荐与回收站
+
+- 文件搜索、建议词、热词、搜索历史
+- 智能推荐生成、查看、采纳、分析
+- 回收站查询、恢复、批量恢复、永久删除、过期清理
+
+### 5. 备份、监控与协作
+
+- 全量备份、增量备份、异步备份任务
+- 备份校验、恢复、统计、配置导入导出
+- 系统指标、健康检查、告警、性能报告
+- 协作项目、成员、文档、评论
+- 实时协作会话、同步、在线协作者、聊天
+
+### 6. 云存储与兼容接口
+
+- 云存储配置管理、能力查询、异步探测、连接测试
+- 默认配置/启用配置查询
+- 保留 legacy 兼容控制器，适合旧前端或旧客户端迁移
+
+## 前后端模块对照
+
+| 模块 | 前端页面 / 路由 | 后端入口 |
+| --- | --- | --- |
+| 认证 | `/login`, `/register` | `/api/auth/**`, `/api/users/**` |
+| 仪表盘 | `/dashboard` | 多模块聚合 |
+| 文件管理 | `/dashboard/files` | `/api/files/**`, `/api/folders/**`, `/api/upload/**`, `/api/preview/**` |
+| 快传中心 | `/dashboard/quick-transfer` | `/api/public/**`, `/api/admin/quick-transfer/**`, `/api/admin/fcb/**` |
+| 发件工作台 | `/dashboard/quick-transfer/share` | `/api/public/share/**`, `/api/public/presign/**` |
+| 取件空间 | `/dashboard/pickup-space` | `/api/public/share/select`, `/api/public/share/download` |
+| 分享管理 | `/dashboard/shares` | `/api/shares/**` |
+| 外链访问 | `/s/:shareKey` | `/api/shares/public/**` |
+| 搜索 | `/dashboard/search` | `/api/search/**` |
+| 推荐 | `/dashboard/recommendations` | `/api/recommendations/**` |
+| 回收站 | `/dashboard/recycle-bin` | `/api/recycle-bin/**` |
+| 备份 | `/dashboard/backup` | `/api/backup/**` |
+| 协作项目 | `/dashboard/collaboration` | `/api/collaboration/projects/**` |
+| 协作工作区 | `/dashboard/collaboration/:projectId` | `/api/collaboration/**`, WebSocket / realtime API |
+| 个人中心 | `/dashboard/profile` | `/api/users/profile`, `/api/users/change-password` |
+
+## 架构速览
+
+```mermaid
+flowchart LR
+    A[Vue 3 Workbench<br/>frontend/] --> B[Vite Dev Server<br/>3000]
+    B --> C[Spring Boot API<br/>8443 / 8080]
+    C --> D[Spring Security + JWT]
+    D --> E[业务服务层]
+    E --> F[(MySQL 8)]
+    E --> G[本地文件存储<br/>uploads/ temp/]
+    E --> H[备份目录<br/>backups/]
+    E --> I[云存储抽象层<br/>MinIO / 其他 provider]
+    E --> J[实时协作与监控]
 ```
 
-2. **编译项目**
-```bash
-mvn clean compile
-```
+## 技术栈
 
-3. **启动应用**
-```bash
-mvn spring-boot:run
-```
+### 后端
 
-4. **访问系统**
-- 应用地址: http://localhost:8080
-- API文档: http://localhost:8080/swagger-ui.html
-- H2控制台: http://localhost:8080/h2-console
-
-### 测试API
-```powershell
-# Windows PowerShell
-.\api-test.ps1
-```
-
-## 📁 项目结构
-
-```
-src/main/java/com/filesharing/
-├── controller/          # 控制层
- │   ├── AuthController.java         # 认证接口
-│   ├── FileController.java         # 文件管理接口
-│   ├── mobile/                     # 移动端接口
-│   └── AIController.java           # AI功能接口
-├── service/             # 服务层
-│   ├── impl/                       # 服务实现
-│   ├── FileService.java            # 文件服务接口
-│   └── AIService.java              # AI服务接口
-├── repository/          # 数据访问层
-│   ├── FileRepository.java         # 文件仓储
-│   └── AIModelRepository.java      # AI模型仓储
-├── entity/              # 实体层
-│   ├── User.java                   # 用户实体
-│   ├── FileEntity.java             # 文件实体
-│   └── AIModel.java                # AI模型实体
-├── dto/                 # 数据传输对象
-│   ├── request/                    # 请求DTO
-│   └── response/                   # 响应DTO
-└── config/              # 配置类
-    ├── SecurityConfig.java         # 安全配置
-    └── DatabaseConfig.java         # 数据库配置
-```
-
-## 🛠️ 核心模块
-
-### 1. 文件管理模块
-```java
-// 文件上传
-POST /api/files/upload
-
-// 文件下载
-GET /api/files/{fileId}/download
-
-// 文件预览
-GET /api/files/{fileId}/preview
-
-// 文件分享
-POST /api/files/{fileId}/share
-```
-
-### 2. 协作办公模块
-```java
-// 创建协作项目
-POST /api/collaboration/projects
-
-// 添加项目成员
-POST /api/collaboration/projects/{projectId}/members
-
-// 创建协作文档
-POST /api/collaboration/documents
-
-// 添加评论
-POST /api/collaboration/documents/{documentId}/comments
-```
-
-### 3. AI智能模块
-```java
-// 文本内容分类
-POST /api/ai/classify-text
-
-// 文件内容分析
-POST /api/ai/analyze-file
-
-// 图像内容识别
-POST /api/ai/recognize-image
-
-// 智能标签推荐
-POST /api/ai/recommend-tags
-```
-
-### 4. 移动端API
-```java
-// 获取最近文件
-GET /api/mobile/files/recent
-
-// 获取收藏文件
-GET /api/mobile/files/favorites
-
-// 分片上传
-POST /api/mobile/upload/chunk
-
-// 文件夹树结构
-GET /api/mobile/folders
-```
-
-## 🔧 配置说明
-
-### application.yml
-```yaml
-server:
-  port: 8080
-
-spring:
-  datasource:
-    url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: 
-  
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    show-sql: true
-
-jwt:
-  secret: your-secret-key
-  expiration: 86400000
-
-file:
-  upload:
-    path: ./uploads/
-    max-size: 100MB
-```
-
-## 📊 API接口文档
-
-### 认证接口
-| 接口 | 方法 | 描述 |
-|------|------|------|
-| `/api/auth/register` | POST | 用户注册 |
-| `/api/auth/login` | POST | 用户登录 |
-| `/api/auth/me` | GET | 获取当前用户信息 |
-
-### 文件接口
-| 接口 | 方法 | 描述 |
-|------|------|------|
-| `/api/files/upload` | POST | 上传文件 |
-| `/api/files/{id}` | GET | 获取文件信息 |
-| `/api/files/{id}/download` | GET | 下载文件 |
-| `/api/files/{id}/preview` | GET | 预览文件 |
-
-### AI接口
-| 接口 | 方法 | 描述 |
-|------|------|------|
-| `/api/ai/classify-text` | POST | 文本分类 |
-| `/api/ai/analyze-file` | POST | 文件分析 |
-| `/api/ai/smart-search` | GET | 智能搜索 |
-| `/api/ai/models` | GET | AI模型列表 |
-
-## 🔒 安全说明
-
-### 认证机制
-- 使用JWT Token进行身份认证
-- Token有效期24小时
-- 支持Token刷新机制
-
-### 权限控制
-- 基于角色的访问控制(RBAC)
-- 文件级别的权限管理
-- 操作日志审计
-
-### 数据保护
-- 敏感信息加密存储
-- SQL注入防护
-- XSS攻击防护
-
-## 📈 性能优化
-
-### 缓存策略
-- Redis缓存热点数据
-- 本地缓存常用配置
-- CDN加速静态资源
-
-### 数据库优化
-- 索引优化
-- 查询优化
-- 连接池配置
-
-### 文件存储
-- 分片上传大文件
-- 支持云存储集成
-- 自动清理临时文件
-
-## 🐛 常见问题
-
-### 启动问题
-**Q: 端口被占用怎么办？**
-A: 修改application.yml中的server.port配置
-
-**Q: 数据库连接失败？**
-A: 检查H2数据库配置，确保驱动版本兼容
-
-### 功能问题
-**Q: 文件上传失败？**
-A: 检查文件大小限制和存储路径权限
-
-**Q: AI功能不可用？**
-A: 确保AI模型配置正确，网络连接正常
-
-## 📞 技术支持
-
-### 开发环境
-- IDE: IntelliJ IDEA / Eclipse
-- 构建工具: Maven
-- 版本控制: Git
-
-### 依赖管理
-```xml
-<!-- 主要依赖 -->
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-web</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-data-jpa</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-security</artifactId>
-</dependency>
-```
-
-## 📄 许可证
-
-本项目采用MIT许可证，详情请查看LICENSE文件。
-
-## 🙏 致谢
-
-感谢以下开源项目的支持：
-- Spring Boot
+- Java 17
+- Spring Boot 2.7.5
+- Spring MVC
 - Spring Security
-- Hibernate
-- H2 Database
-- Lombok
+- Spring Data JPA
+- MySQL 8
+- WebSocket
+- Jackson
+- JJWT
 - Apache Tika
+- Thumbnailator
+- Actuator + Micrometer
+- MinIO SDK
 
----
+### 前端
 
-**文件共享系统** - 让文件协作变得更简单！ 🚀
+- Vue 3
+- TypeScript
+- Vite 5
+- Vue Router 4
+- Pinia
+- Element Plus
+- Axios
+- QRCode
 
-## 🔗 前端集成与示例代码
+## 仓库结构
 
-本项目后端采用 JWT 鉴权，所有需要用户身份的请求必须在 HTTP Header 中携带：
-
-- Authorization: Bearer <token>
-
-下列为前端需要关注的后端接口（与示例）：
-
-1) 分片上传（Chunked Upload）
-- 初始化分片上传：POST /api/upload/chunk/init  (参数: filename) -> 返回 { uploadId }
-- 上传分片：POST /api/upload/chunk (参数: uploadId, chunkIndex, chunk MultipartFile)
-- 完成合并：POST /api/upload/chunk/complete (参数: uploadId, filename, 可选 contentType)
-
-示例 JavaScript（浏览器端）:
-
-```javascript
-// 简化示例：按顺序上传分片（不处理断点续传/重试）
-async function uploadFileInChunks(file, token) {
-  const filename = file.name;
-  // init
-  const initResp = await fetch('/api/upload/chunk/init', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ filename })
-  });
-  const initJson = await initResp.json();
-  const uploadId = initJson.uploadId;
-
-  const chunkSize = 5 * 1024 * 1024; // 前端可与后端配置对齐
-  let chunkIndex = 0;
-  for (let start = 0; start < file.size; start += chunkSize) {
-    const end = Math.min(start + chunkSize, file.size);
-    const part = file.slice(start, end);
-    const form = new FormData();
-    form.append('uploadId', uploadId);
-    form.append('chunkIndex', chunkIndex);
-    form.append('chunk', part, filename);
-
-    await fetch('/api/upload/chunk', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: form
-    });
-
-    chunkIndex++;
-  }
-
-  // complete
-  const completeForm = new FormData();
-  completeForm.append('uploadId', uploadId);
-  completeForm.append('filename', filename);
-  completeForm.append('contentType', file.type || 'application/octet-stream');
-
-  const completeResp = await fetch('/api/upload/chunk/complete', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + token },
-    body: completeForm
-  });
-
-  return await completeResp.json();
-}
+```text
+.
+├─ src/main/java/com/filesharing/
+│  ├─ controller/           # 主业务控制器
+│  ├─ upload/               # 分片上传控制器
+│  ├─ service/              # 服务接口
+│  ├─ service/impl/         # 服务实现
+│  ├─ repository/           # JPA 仓储
+│  ├─ entity/               # 数据实体
+│  ├─ dto/                  # 请求与响应对象
+│  ├─ config/               # 安全、HTTPS、WebSocket、定时任务配置
+│  ├─ backup/               # 备份与恢复实现
+│  ├─ monitoring/           # 监控能力
+│  └─ websocket/            # 协作 WebSocket
+├─ src/main/resources/
+│  ├─ application.yml       # 主配置
+│  └─ certs/keystore.p12    # 默认 HTTPS 证书
+├─ frontend/
+│  ├─ src/layouts/          # 主布局
+│  ├─ src/pages/            # 19 个页面
+│  ├─ src/stores/           # Pinia 状态
+│  ├─ src/services/         # 前端 API 封装
+│  └─ vite.config.ts        # 本地开发代理配置
+├─ scripts/                 # 冒烟与迁移脚本
+├─ api_endpoints.*          # 接口清单
+├─ api_inventory_readme.md  # 扫描结果摘要
+└─ postman_collection.json  # Postman 集合
 ```
 
-2) 常用前端接口使用约定
-- 需在每次请求中带上 Authorization: Bearer <token>。
-- 上传时请先确认后端配置：
-  - upload.chunk.max-size（单分片上限）
-  - upload.file.max-size（单文件上限）
-  - upload.allowed-types-csv（允许的 MIME 类型，逗号分隔）
+## 快速启动
 
-3) 推荐实践
-- 在上传时做分片重试与并发控制（例如最多并发 3-4 个分片）。
-- 在合并完成后，前端可比较后端返回的 sha256 值进行完整性校验。
-- 定期清理挂起的临时分片目录由后端的 UploadCleanupTask 负责（默认 24 小时）。
+### 1. 环境准备
 
-## ✅ 运行与验证（新增）
+- JDK 17+
+- Maven 3.6+
+- Node.js 18+
+- MySQL 8+
 
-下面步骤可以帮助你在开发环境快速启动并验证系统的关键功能（包括分片上传与断点续传）。
+### 2. 初始化数据库
 
-1) 环境准备
-- Java 17 或更高，Maven 3.6+。
-- Node.js 16+（若前端需要本地开发）。
-- 在项目根目录确保 `uploads/` 与 `temp/` 目录存在或可被应用创建，并赋予读写权限。
-- 在 `src/main/resources/application.yml` 中配置一个稳定的 `jwt.secret`，例如：
+默认数据库配置来自 [application.yml](./src/main/resources/application.yml)：
 
-```yaml
-jwt:
-  secret: change-this-to-a-strong-secret
-  expiration: 86400000
-```
+- 数据库：`filesharing`
+- 用户名：`root`
+- 密码：`123456`
 
-2) 后端启动
-- 在项目根：
+可选初始化方式：
+
+- 执行 `init_mysql.ps1`
+- 执行 `init_mysql.bat`
+- 手动导入 `setup_mysql.sql`
+- 手动导入 `database_setup.sql`
+
+### 3. 启动后端
+
+推荐直接按仓库当前配置启动，保持 HTTPS 默认开启：
 
 ```powershell
-mvn clean compile
-mvn spring-boot:run
+mvn clean spring-boot:run
 ```
 
-- 后端默认运行在 http://localhost:8080
+当前默认行为：
 
-3) 前端启动（可选，本地开发）
-- 进入 `frontend` 目录，安装依赖并启动：
+- HTTPS 监听 `8443`
+- HTTP 监听 `8080`
+- `8080` 会重定向到 `8443`
+- 默认证书位于 `src/main/resources/certs/keystore.p12`
+
+健康检查可用：
+
+```powershell
+curl.exe -k https://localhost:8443/api/files/public
+```
+
+如果你想临时关闭 HTTPS，用纯 HTTP 跑本地开发：
+
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.arguments=--server.ssl.enabled=false --server.port=8080"
+```
+
+注意：如果你切到纯 HTTP，需要同时调整前端代理目标。
+
+### 4. 启动前端
 
 ```powershell
 cd frontend
@@ -407,162 +223,357 @@ npm install
 npm run dev
 ```
 
-- 若前端通过 Vite 在其他端口运行，请确保已配置代理或后端允许 CORS。
+前端默认运行在 `http://localhost:3000`，并通过 [frontend/vite.config.ts](./frontend/vite.config.ts) 把 `/api` 代理到：
 
-4) 快速验证：认证与分片上传
-- 使用 Postman / curl 或前端页面执行登录，获取 JWT token。
-  - 登录接口：POST /api/auth/login，返回 token（确保 `jwt.secret` 一致）。
-- 使用 token 调用初始化接口并检查已存在分片（支持断点续传）：
+```text
+https://localhost:8443
+```
+
+当前代理已设置：
+
+- `changeOrigin: true`
+- `secure: false`
+
+这意味着本地自签名证书可以直接联调。
+
+### 5. 构建前端
 
 ```powershell
-# 假设 TOKEN 环境变量已设置
-curl -X POST "http://localhost:8080/api/upload/chunk/init" -H "Authorization: Bearer $TOKEN" -d "filename=test.bin"
+cd frontend
+npm run type-check
+npm run build
 ```
 
-返回示例：
+### 6. Docker 一键启动（前端 + 后端 + MySQL + MinIO）
 
-```json
-{
-  "uploadId": "...",
-  "filename": "test.bin",
-  "existingParts": [0,1,2]
-}
-```
+仓库根目录已提供：
 
-- 按照返回的 uploadId 上传分片：
+- `Dockerfile`：后端镜像构建
+- `docker-compose.yml`：MySQL、MinIO、MinIO 初始化、后端编排
+- `docker/minio/minio-init.sh`：自动创建 `filesharing` bucket
+- `frontend/Dockerfile`：前端镜像构建
+- `frontend/nginx.conf`：前端静态服务与 `/api` 反向代理
+
+启动命令：
 
 ```powershell
-# 上传第0片
-curl -X POST "http://localhost:8080/api/upload/chunk" -H "Authorization: Bearer $TOKEN" -F "uploadId=<uploadId>" -F "chunkIndex=0" -F "chunk=@part0.bin"
+docker compose up -d --build
 ```
 
-- 上传所有需要的分片后调用合并接口：
+查看初始化与后端日志：
 
 ```powershell
-curl -X POST "http://localhost:8080/api/upload/chunk/complete" -H "Authorization: Bearer $TOKEN" -F "uploadId=<uploadId>" -F "filename=test.bin" -F "contentType=application/octet-stream"
+docker compose logs -f minio-init backend
 ```
 
-返回示例包含 `fileId` 与可选的 `sha256` 校验值。
+启动后默认访问：
 
-5) 常见问题与排查
-- 无法认证/401：确认 `jwt.secret` 是否在 `application.yml` 中配置且服务已重启；前端需在每次请求头中带上 `Authorization: Bearer <token>`。
-- 前端不带 token：项目中部分位置可能使用 `localStorage['token']` 或 `localStorage['auth-storage']` 存储 token，我已将关键上传路径使用 `token` 作为主键。建议全仓统一为 `token`。
-- 临时分片未清理：UploadCleanupTask 默认每小时运行并删除超过配置期限的临时目录。你可以在 `application.yml` 中配置 `upload.cleanup.expire-hours`。
-- 数据丢失：开发配置使用 H2 的 create-drop，生产环境请配置持久化数据库并使用迁移脚本（Flyway/Liquibase）。
+- 前端工作台：`http://localhost:3000`
+- 后端 API：`http://localhost:8080`
+- MinIO API：`http://localhost:9000`
+- MinIO Console：`http://localhost:9001`
+- MinIO 默认账号：`minioadmin / minioadmin`
 
----
+当前 compose 会为后端注入以下关键参数：
 
-## 全量 API 接口清单（自动扫描）
+- `STORAGE_TYPE=minio`
+- `STORAGE_MINIO_ENDPOINT=http://minio:9000`
+- `STORAGE_MINIO_BUCKET=filesharing`
+- MySQL 连接信息（容器内主机名 `mysql`）
 
-> 扫描来源：`src/main/java/**` 控制器与上传控制器注解。  
-> 联调方式：后端直连 `http://localhost:8080` 与前端代理 `http://localhost:3001` 双通道冒烟。
+前端容器通过 Nginx 将 `/api/*` 转发到 `backend:8080`，浏览器侧无需额外配置 API 地址。
 
-- 本次扫描接口总数：104
-- 双通道可达接口：104/104
+停止并清理：
 
-| Method | Path | Controller | BackendStatus | ProxyStatus |
-|---|---|---|---:|---:|
-| DELETE | /api/backup/{backupPath} | BackupController | 403 | 403 |
-| DELETE | /api/backup/cleanup | BackupController | 403 | 403 |
-| DELETE | /api/cloud-storage/configs/{configId} | CloudStorageController | 403 | 403 |
-| DELETE | /api/files/{fileId} | FileController | 403 | 403 |
-| DELETE | /api/mobile/files/{fileId}/favorite | MobileFileController | 403 | 403 |
-| DELETE | /api/monitoring/cleanup | MonitoringController | 403 | 403 |
-| DELETE | /api/recommendations/cleanup | RecommendationController | 403 | 403 |
-| GET | /api/ai/analyze-behavior | AIController | 403 | 403 |
-| GET | /api/ai/models | AIController | 403 | 403 |
-| GET | /api/ai/smart-search | AIController | 403 | 403 |
-| GET | /api/auth/me | AuthController | 401 | 401 |
-| GET | /api/backup/config/export | BackupController | 403 | 403 |
-| GET | /api/backup/list | BackupController | 403 | 403 |
-| GET | /api/backup/statistics | BackupController | 403 | 403 |
-| GET | /api/backup/task/{taskId} | BackupController | 403 | 403 |
-| GET | /api/cloud-storage/configs | CloudStorageController | 403 | 403 |
-| GET | /api/cloud-storage/configs/{configId} | CloudStorageController | 403 | 403 |
-| GET | /api/cloud-storage/configs/{configId}/usage | CloudStorageController | 403 | 403 |
-| GET | /api/cloud-storage/configs/default | CloudStorageController | 403 | 403 |
-| GET | /api/cloud-storage/configs/enabled | CloudStorageController | 403 | 403 |
-| GET | /api/cloud-storage/configs/info | CloudStorageController | 403 | 403 |
-| GET | /api/demo/health | DemoController | 403 | 403 |
-| GET | /api/demo/info | DemoController | 403 | 403 |
-| GET | /api/files/{fileId} | FileController | 403 | 403 |
-| GET | /api/files/{fileId}/download | FileController | 403 | 403 |
-| GET | /api/files/my | FileController | 403 | 403 |
-| GET | /api/files/public | FileController | 200 | 200 |
-| GET | /api/mobile/enhanced/activity/recent | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/announcements | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/config | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/files/{fileId}/preview-info | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/files/{fileId}/thumbnail-info | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/storage/usage | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/enhanced/version/check | MobileEnhancedController | 403 | 403 |
-| GET | /api/mobile/files/favorites | MobileFileController | 403 | 403 |
-| GET | /api/mobile/files/offline-available | MobileFileController | 403 | 403 |
-| GET | /api/mobile/files/recent | MobileFileController | 403 | 403 |
-| GET | /api/mobile/files/search | MobileFileController | 403 | 403 |
-| GET | /api/mobile/folders | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/folders/{folderId}/breadcrumb | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/folders/{folderId}/subfolders | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/folders/quick-access | MobileFolderController | 403 | 403 |
-| GET | /api/mobile/upload/progress/{uploadId} | MobileUploadController | 403 | 403 |
-| GET | /api/monitoring/alerts | MonitoringController | 403 | 403 |
-| GET | /api/monitoring/health | MonitoringController | 403 | 403 |
-| GET | /api/monitoring/metrics | MonitoringController | 403 | 403 |
-| GET | /api/monitoring/metrics/history | MonitoringController | 403 | 403 |
-| GET | /api/monitoring/report | MonitoringController | 403 | 403 |
-| GET | /api/monitoring/statistics | MonitoringController | 403 | 403 |
-| GET | /api/preview/{fileId} | PreviewController | 403 | 403 |
-| GET | /api/preview/{fileId}/content | PreviewController | 403 | 403 |
-| GET | /api/preview/{fileId}/image | PreviewController | 403 | 403 |
-| GET | /api/preview/{fileId}/pdf | PreviewController | 403 | 403 |
-| GET | /api/preview/{fileId}/statistics | PreviewController | 403 | 403 |
-| GET | /api/preview/{fileId}/text | PreviewController | 403 | 403 |
-| GET | /api/preview/popular | PreviewController | 403 | 403 |
-| GET | /api/preview/user/statistics | PreviewController | 403 | 403 |
-| GET | /api/recommendations | RecommendationController | 403 | 403 |
-| GET | /api/recommendations/analytics | RecommendationController | 403 | 403 |
-| GET | /api/recommendations/similar/{itemId} | RecommendationController | 403 | 403 |
-| GET | /api/users/profile | UserController | 403 | 403 |
-| POST | /api/ai/analyze-file | AIController | 403 | 403 |
-| POST | /api/ai/classify-text | AIController | 403 | 403 |
-| POST | /api/ai/document-summary | AIController | 403 | 403 |
-| POST | /api/ai/keywords | AIController | 403 | 403 |
-| POST | /api/ai/question-answer | AIController | 403 | 403 |
-| POST | /api/ai/recognize-image | AIController | 403 | 403 |
-| POST | /api/ai/recommend-tags | AIController | 403 | 403 |
-| POST | /api/ai/sentiment | AIController | 403 | 403 |
-| POST | /api/ai/similarity | AIController | 403 | 403 |
-| POST | /api/ai/summarize | AIController | 403 | 403 |
-| POST | /api/ai/test-model/{modelId} | AIController | 403 | 403 |
-| POST | /api/ai/text-correction | AIController | 403 | 403 |
-| POST | /api/auth/debug-login | AuthController | 400 | 400 |
-| POST | /api/auth/login | AuthController | 400 | 400 |
-| POST | /api/auth/register | AuthController | 400 | 400 |
-| POST | /api/backup/async | BackupController | 403 | 403 |
-| POST | /api/backup/config/import | BackupController | 403 | 403 |
-| POST | /api/backup/full | BackupController | 403 | 403 |
-| POST | /api/backup/incremental | BackupController | 403 | 403 |
-| POST | /api/backup/restore | BackupController | 403 | 403 |
-| POST | /api/backup/validate | BackupController | 403 | 403 |
-| POST | /api/cloud-storage/configs | CloudStorageController | 403 | 403 |
-| POST | /api/cloud-storage/configs/{configId}/test-connection | CloudStorageController | 403 | 403 |
-| POST | /api/demo/register | DemoController | 403 | 403 |
-| POST | /api/files/upload | FileController | 403 | 403 |
-| POST | /api/mobile/enhanced/feedback | MobileEnhancedController | 403 | 403 |
-| POST | /api/mobile/enhanced/files/batch-operate | MobileEnhancedController | 403 | 403 |
-| POST | /api/mobile/enhanced/sync | MobileEnhancedController | 403 | 403 |
-| POST | /api/mobile/files/{fileId}/favorite | MobileFileController | 403 | 403 |
-| POST | /api/mobile/upload | MobileUploadController | 403 | 403 |
-| POST | /api/mobile/upload/chunk | MobileUploadController | 403 | 403 |
-| POST | /api/mobile/upload/init-chunk | MobileUploadController | 403 | 403 |
-| POST | /api/monitoring/alerts/test | MonitoringController | 403 | 403 |
-| POST | /api/recommendations/generate | RecommendationController | 403 | 403 |
-| POST | /api/upload/chunk | ChunkUploadController | 403 | 403 |
-| POST | /api/upload/chunk/complete | ChunkUploadController | 403 | 403 |
-| POST | /api/upload/chunk/init | ChunkUploadController | 403 | 403 |
-| POST | /api/users/change-password | UserController | 403 | 403 |
-| PUT | /api/cloud-storage/configs/{configId} | CloudStorageController | 403 | 403 |
-| PUT | /api/monitoring/alerts/{alertId}/close | MonitoringController | 403 | 403 |
-| PUT | /api/recommendations/{id}/adopt | RecommendationController | 403 | 403 |
-| PUT | /api/recommendations/{id}/view | RecommendationController | 403 | 403 |
-| PUT | /api/users/profile | UserController | 403 | 403 |
+```powershell
+docker compose down
+```
+
+## 配置说明
+
+### 当前 `application.yml` 里的关键配置
+
+| 配置项 | 当前值 / 默认行为 | 说明 |
+| --- | --- | --- |
+| `server.port` | `8443` | HTTPS 端口 |
+| `server.http.port` | `8080` | HTTP 端口，开启 SSL 时用于跳转 |
+| `server.ssl.enabled` | `true` | 当前仓库默认启用 HTTPS |
+| `spring.datasource.url` | `jdbc:mysql://localhost:3306/filesharing...` | MySQL 连接 |
+| `file.upload.path` | `./uploads/` | 文件正式存储目录 |
+| `file.upload.temp-path` | `./temp/` | 分片与临时文件目录 |
+| `file.upload.max-size` | `100MB` | Spring Multipart 限制 |
+| `storage.type` | `local` | 存储后端，支持切换 |
+| `storage.minio.*` | 已提供示例 | MinIO 接入参数 |
+| `upload.chunk.max-size` | `5MB` | 单分片最大大小 |
+| `upload.file.max-size` | `10GB` | 单文件上传上限 |
+| `jwt.expiration` | `86400000` | JWT 有效期 24 小时 |
+| `fcb.open-upload` | `true` | 快传是否允许游客上传 |
+| `fcb.upload-size` | `10MB` | 快传单文件上限 |
+| `fcb.presign-expire-seconds` | `900` | 直传会话有效期 |
+| `fcb.download-token-ttl-seconds` | `600` | 取件下载令牌有效期 |
+| `geoip.service-url` | `https://ipwho.is/{ip}` | 访问地址解析 |
+
+### 备份配置的一个代码细节
+
+`DataBackupService` 还支持以下配置项：
+
+- `backup.base-path`
+- `backup.max-size`
+- `backup.compression-level`
+
+这几个配置当前没有直接写在 `application.yml` 中，但服务代码里已经实现了默认值回退：
+
+- `backup.base-path` 默认 `./backups`
+- `backup.max-size` 默认 `10737418240`
+- `backup.compression-level` 默认 `6`
+
+如果你要定制备份目录或压缩级别，可以直接把这些键补进配置文件。
+
+## 认证与安全
+
+### 鉴权方式
+
+- 绝大多数业务接口使用 JWT
+- 认证头格式：
+
+```text
+Authorization: Bearer <token>
+```
+
+### 公开接口范围
+
+根据 [SecurityConfig.java](./src/main/java/com/filesharing/config/SecurityConfig.java)，当前公开访问包括：
+
+- `/api/auth/**`
+- `/api/files/public/**`
+- `/api/shares/public/**`
+- `/api/public/**`
+- `/api/share/**`
+- `/api/chunk/**`
+- `/api/presign/**`
+- `/api/admin/login`
+- `/s/**`
+- `/api/health`
+
+### 当前安全实现特点
+
+- `SessionCreationPolicy.STATELESS`
+- JWT 过滤器已启用
+- CORS 允许所有来源
+- H2 Console 放行
+
+## API 模块总览
+
+仓库里有自动扫描产物 [api_inventory_readme.md](./api_inventory_readme.md)，当前记录：
+
+- 已扫描接口总数：`65`
+- 双通道可达接口：`65/65`
+
+### 主要 API 域
+
+| 域 | 基础路径 | 说明 |
+| --- | --- | --- |
+| 认证 | `/api/auth` | 注册、登录、获取当前用户 |
+| 用户 | `/api/users` | 个人资料、修改密码 |
+| 文件 | `/api/files` | 文件 CRUD、预览、收藏、统计 |
+| 文件夹 | `/api/folders` | 文件夹 CRUD 与内容查询 |
+| 上传 | `/api/upload` | 分片上传初始化、上传、合并完成 |
+| 快传公开接口 | `/api/public` | 文本/文件快传、取件、预签名直传 |
+| 快传管理 | `/api/admin/quick-transfer`, `/api/admin/fcb` | 配置、记录、导出 |
+| 分享 | `/api/shares` | 创建分享、我的分享、公开访问 |
+| 搜索 | `/api/search` | 搜索、建议、热词、历史、统计 |
+| 回收站 | `/api/recycle-bin` | 查询、恢复、清空、过期处理 |
+| 推荐 | `/api/recommendations` | 生成、查看、采纳、分析 |
+| 备份 | `/api/backup` | 全量、增量、异步、校验、恢复 |
+| 协作 | `/api/collaboration` | 项目、成员、文档、评论、实时 |
+| 监控 | `/api/monitoring` | 健康、指标、告警、报告 |
+| 云存储 | `/api/cloud-storage` | 能力、配置、探测、测试连接 |
+| 预览 | `/api/preview` | 文件内容、图片、PDF、文本统计 |
+| 兼容接口 | `/api/admin`, `/api/share`, `/api/chunk`, `/api/presign` | 旧客户端兼容 |
+
+## 前端工作台页面
+
+前端路由来自 [frontend/src/router/index.ts](./frontend/src/router/index.ts)。
+
+### 已实现页面
+
+| 路由 | 页面 |
+| --- | --- |
+| `/dashboard` | 工作台总览 |
+| `/dashboard/files` | 文件管理 |
+| `/dashboard/preview/:id` | 文件预览 |
+| `/dashboard/quick-transfer` | 快传中心 |
+| `/dashboard/quick-transfer/share` | 快传工作台 |
+| `/dashboard/quick-transfer/config` | 快传配置 |
+| `/dashboard/quick-transfer/records` | 快传记录 |
+| `/dashboard/pickup-space` | 取件空间 |
+| `/dashboard/search` | 搜索 |
+| `/dashboard/shares` | 分享管理 |
+| `/dashboard/recycle-bin` | 回收站 |
+| `/dashboard/recommendations` | 智能推荐 |
+| `/dashboard/backup` | 备份 |
+| `/dashboard/collaboration` | 协作项目 |
+| `/dashboard/collaboration/:projectId` | 协作工作区 |
+| `/dashboard/profile` | 个人中心 |
+| `/s/:shareKey` | 外链访问页 |
+
+## 典型开发命令
+
+### 后端
+
+```powershell
+mvn clean compile
+mvn test
+mvn spring-boot:run
+```
+
+### 前端
+
+```powershell
+cd frontend
+npm install
+npm run dev
+npm run type-check
+npm run build
+```
+
+## 仓库内可直接使用的辅助资产
+
+### 接口资产
+
+- [api_endpoints.md](./api_endpoints.md)
+- [api_endpoints.json](./api_endpoints.json)
+- [api_endpoints.tsv](./api_endpoints.tsv)
+- [api_inventory_readme.md](./api_inventory_readme.md)
+- [postman_collection.json](./postman_collection.json)
+
+### 脚本
+
+- `api-test.ps1`
+- `comprehensive_api_test.ps1`
+- `scripts/api_smoke_test.ps1`
+- `init_mysql.ps1`
+- `init_mysql.bat`
+- `manual-start.bat`
+- `diagnostic.bat`
+- `verify_database.bat`
+
+## 代码分析后需要你注意的几点
+
+### 1. README 不能再写成“默认 8080 + Swagger 可直接访问”
+
+当前代码实际情况是：
+
+- 后端默认 HTTPS 端口是 `8443`
+- `8080` 是 HTTP 跳转端口
+- 仓库确实引入了 `springdoc-openapi-ui`
+- 但安全配置里 Swagger 放行规则仍是注释状态
+- 主启动类打印的 `http://localhost:8080/api/swagger-ui/` 更像历史遗留提示，不应当作为当前文档依据
+
+### 2. 云存储模块已经成型，但实现里有简化逻辑
+
+[CloudStorageServiceImpl.java](./src/main/java/com/filesharing/service/impl/CloudStorageServiceImpl.java) 中：
+
+- 配置管理、默认配置切换、启用配置查询是完整的
+- 但部分上传 / 签名 URL / provider 行为仍是简化实现
+- 示例中能看到 `http://example.com/...` 这类占位返回
+
+结论：
+
+- 可以把它当成“云存储抽象层与配置中心”
+- 如果要生产落地，必须逐 provider 验证真实 SDK 行为
+
+### 3. 备份系统是真实业务，不是占位接口
+
+[DataBackupService.java](./src/main/java/com/filesharing/backup/DataBackupService.java) 已经实现了：
+
+- 全量备份
+- 增量备份
+- 异步任务持久化
+- 数据库导出
+- 文件归档 ZIP
+- SHA-256 校验
+- 恢复与清理
+
+这部分在 README 中应按真实能力描述，而不是一句“支持备份”带过。
+
+### 4. 快传中心是独立业务域，不是普通分享的皮肤
+
+[FileCodeBoxService.java](./src/main/java/com/filesharing/service/FileCodeBoxService.java) 显示当前快传具备：
+
+- 文本快传
+- 文件快传
+- 预签名上传
+- 取件码
+- 下载授权
+- 频率限制
+- 游客上传开关
+
+因此文档中应把“快传”单列，而不是混在“文件分享”里。
+
+### 5. 当前仓库默认凭据都是开发态
+
+直接写在配置里的内容包括：
+
+- MySQL `root / 123456`
+- HTTPS keystore password `changeit`
+- JWT secret 固定值
+
+这些适合本地开发，不适合直接用于生产环境。
+
+## 常见问题
+
+### 1. 前端能打开，接口全红
+
+先检查两件事：
+
+- 后端是否真的跑在 `https://localhost:8443`
+- 前端代理是否仍指向 `https://localhost:8443`
+
+### 2. 本地证书报错
+
+当前前端代理已配置 `secure: false`。如果你用 `curl` 或浏览器直接访问接口，需要接受或跳过本地自签名证书校验。
+
+### 3. 分片上传报 401
+
+`/api/upload/chunk/*` 当前要求用户已认证，不是游客接口。
+
+### 4. 快传能发不能取
+
+优先检查：
+
+- `fcb.open-upload`
+- 取件码是否过期
+- 错误次数是否触发风控窗口
+
+### 5. 备份配置不生效
+
+先确认你修改的是：
+
+- `application.yml` 中实际存在的键
+- 或者你已经补充了 `backup.base-path` / `backup.max-size` / `backup.compression-level`
+
+## 适合继续补强的方向
+
+- 给云存储模块补齐真实 provider SDK 行为
+- 把 Swagger/OpenAPI 的暴露策略和 README 对齐
+- 为协作、备份、快传分别补更完整的集成测试
+- 为生产环境提供 `.env` / profile 分层配置
+- 收敛默认密钥、数据库密码和证书密码
+
+## 结论
+
+如果你的目标是：
+
+- 本地快速跑起来
+- 有一个完整的文件共享与协作工作台
+- 能继续往企业内网文件平台方向扩展
+
+那么这份仓库已经具备不错的基础。
+
+如果你的目标是直接生产落地，则最需要优先核查的是：
+
+- HTTPS / 证书 / 环境变量管理
+- 云存储 provider 的真实上传链路
+- 安全默认值
+- 各业务域的集成测试覆盖

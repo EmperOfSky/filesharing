@@ -1,6 +1,6 @@
 package com.filesharing.config;
 
-import com.filesharing.websocket.DocumentLockManager;
+import com.filesharing.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.server.ServerHttpRequest;
@@ -19,7 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
     
-    private final DocumentLockManager documentLockManager;
+    private final JwtUtil jwtUtil;
     
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
@@ -45,17 +45,18 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
             // 尝试从URL参数中获取token
             String token = servletRequest.getServletRequest().getParameter("token");
             if (token != null && !token.isEmpty()) {
-                // 验证JWT token并提取用户信息
-                // String userId = jwtTokenUtil.getUserIdFromToken(token);
-                // if (userId != null) {
-                //     attributes.put("userId", userId);
-                //     attributes.put("username", jwtTokenUtil.getUsernameFromToken(token));
-                //     return true;
-                // }
-                attributes.put("userId", "temp_user_" + System.currentTimeMillis());
-                attributes.put("username", "临时用户");
-                log.debug("WebSocket握手成功: 临时用户");
-                return true;
+                try {
+                    if (jwtUtil.validateToken(token)) {
+                        Long userId = jwtUtil.getUserIdFromToken(token);
+                        String username = jwtUtil.getUsernameFromToken(token);
+                        attributes.put("userId", String.valueOf(userId));
+                        attributes.put("username", username != null ? username : "Unknown");
+                        log.debug("WebSocket握手成功: 用户ID={}", userId);
+                        return true;
+                    }
+                } catch (Exception ex) {
+                    log.warn("WebSocket token校验失败: {}", ex.getMessage());
+                }
             }
         }
         

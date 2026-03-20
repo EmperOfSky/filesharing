@@ -12,7 +12,7 @@ export interface FileCodeBoxSelectResult {
   text: string
 }
 
-export interface FileCodeBoxPresignInitResult {
+interface FileCodeBoxPresignInitResult {
   upload_id: string
   upload_url: string
   mode: 'direct' | 'proxy'
@@ -43,7 +43,7 @@ export interface FileCodeBoxRecordItem {
   remain_count?: number
 }
 
-export interface FileCodeBoxRecordPageResult {
+interface FileCodeBoxRecordPageResult {
   content: FileCodeBoxRecordItem[]
   number: number
   size: number
@@ -67,7 +67,7 @@ export interface FileCodeBoxAdminConfig {
   download_token_ttl_seconds: number
 }
 
-export interface FileCodeBoxAdminConfigUpdatePayload {
+interface FileCodeBoxAdminConfigUpdatePayload {
   open_upload?: boolean
   upload_size?: number
   upload_count?: number
@@ -125,16 +125,12 @@ class FileCodeBoxService {
     })
   }
 
-  async getPresignStatus(uploadId: string): Promise<Record<string, unknown>> {
-    return http.get<Record<string, unknown>>(`/public/presign/upload/status/${uploadId}`)
-  }
-
   async getAdminConfig(): Promise<FileCodeBoxAdminConfig> {
-    return http.get<FileCodeBoxAdminConfig>('/admin/fcb/config')
+    return http.get<FileCodeBoxAdminConfig>('/admin/quick-transfer/config')
   }
 
   async updateAdminConfig(payload: FileCodeBoxAdminConfigUpdatePayload): Promise<FileCodeBoxAdminConfig> {
-    return http.put<FileCodeBoxAdminConfig>('/admin/fcb/config', payload)
+    return http.put<FileCodeBoxAdminConfig>('/admin/quick-transfer/config', payload)
   }
 
   async getAdminRecords(params: {
@@ -144,7 +140,7 @@ class FileCodeBoxService {
     status?: string
     share_type?: string
   }): Promise<FileCodeBoxRecordPageResult> {
-    return http.get<FileCodeBoxRecordPageResult>('/admin/fcb/records', { params })
+    return http.get<FileCodeBoxRecordPageResult>('/admin/quick-transfer/records', { params })
   }
 
   async exportAdminRecordsCsv(params: {
@@ -152,18 +148,18 @@ class FileCodeBoxService {
     status?: string
     share_type?: string
   }): Promise<Blob> {
-    return http.get<Blob>('/admin/fcb/records/export', {
+    return http.get<Blob>('/admin/quick-transfer/records/export', {
       params,
       responseType: 'blob' as any
     })
   }
 
   async updateAdminRecordStatus(recordId: number, status: 'ACTIVE' | 'DISABLED'): Promise<FileCodeBoxRecordItem> {
-    return http.patch<FileCodeBoxRecordItem>(`/admin/fcb/records/${recordId}/status`, { status })
+    return http.patch<FileCodeBoxRecordItem>(`/admin/quick-transfer/records/${recordId}/status`, { status })
   }
 
   async deleteAdminRecord(recordId: number): Promise<Record<string, unknown>> {
-    return http.delete<Record<string, unknown>>(`/admin/fcb/records/${recordId}`)
+    return http.delete<Record<string, unknown>>(`/admin/quick-transfer/records/${recordId}`)
   }
 }
 

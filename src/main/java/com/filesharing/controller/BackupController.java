@@ -7,14 +7,19 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionException;
 
 /**
  * 数据备份控制器
@@ -28,6 +33,14 @@ import java.util.concurrent.CompletableFuture;
 public class BackupController {
     
     private final DataBackupService backupService;
+    @Value("${backup.base-path:./backups}")
+    private String backupBasePath;
+    @Value("${backup.max-size:10737418240}")
+    private long maxBackupSize;
+    @Value("${backup.compression-level:6}")
+    private int compressionLevel;
+    private final Map<String, CompletableFuture<DataBackupService.BackupResult>> asyncRequestFutures = new ConcurrentHashMap<>();
+    private final Map<String, AsyncRequestMeta> asyncRequestMeta = new ConcurrentHashMap<>();
     
     /**
      * 创建完整备份
@@ -74,21 +87,49 @@ public class BackupController {
     public ResponseEntity<ApiResponse<Map<String, String>>> createBackupAsync(
             @RequestBody Map<String, Object> request) {
         try {
-            String backupName = (String) request.get("backupName");
-            String backupType = (String) request.get("backupType");
-            boolean includeFiles = (Boolean) request.getOrDefault("includeFiles", true);
+            String backupName = request.get("backupName") == null ? null : String.valueOf(request.get("backupName")).trim();
+            String backupType = request.get("backupType") == null ? "FULL" : String.valueOf(request.get("backupType")).trim().toUpperCase();
+            boolean includeFiles = parseBoolean(request.get("includeFiles"), true);
             String sinceTimeString = (String) request.get("sinceTime");
+
+            if (!StringUtils.hasText(backupName)) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("启动异步备份失败: backupName不能为空"));
+            }
+
+            if (!"FULL".equals(backupType) && !"INCREMENTAL".equals(backupType)) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("启动异步备份失败: 不支持的备份类型 " + backupType));
+            }
             
             LocalDateTime sinceTime = sinceTimeString != null ? LocalDateTime.parse(sinceTimeString) : null;
+            if ("INCREMENTAL".equals(backupType) && sinceTime == null) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("启动异步备份失败: 增量备份必须提供sinceTime"));
+            }
             
-            CompletableFuture<DataBackupService.BackupResult> future = 
+            CompletableFuture<DataBackupService.BackupResult> future =
                 backupService.createBackupAsync(backupName, backupType, includeFiles, sinceTime);
-            
-            // 获取任务ID（这里简化处理）
-            String taskId = "async_" + System.currentTimeMillis();
+
+            String requestId = "async_" + System.currentTimeMillis();
+            asyncRequestFutures.put(requestId, future);
+            asyncRequestMeta.put(requestId, new AsyncRequestMeta(backupName, backupType, LocalDateTime.now()));
+
+            future.whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    log.error("异步备份任务执行失败: backupName={}, backupType={}", backupName, backupType, throwable);
+                    return;
+                }
+                if (result != null) {
+                    log.info("异步备份任务完成: taskId={}, backupName={}, success={}", result.getTaskId(), backupName, result.getSuccess());
+                }
+            });
             
             Map<String, String> response = new HashMap<>();
-            response.put("taskId", taskId);
+            response.put("taskId", requestId);
+            response.put("requestId", requestId);
+            response.put("backupName", backupName);
+            response.put("backupType", backupType);
             response.put("message", "备份任务已启动");
             response.put("status", "RUNNING");
             
@@ -98,6 +139,23 @@ public class BackupController {
             log.error("启动异步备份失败", e);
             return ResponseEntity.badRequest()
                 .body(ApiResponse.error("启动异步备份失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 删除备份（查询参数版本，支持完整路径）
+     */
+    @DeleteMapping("/delete")
+    @Operation(summary = "删除备份（Query模式）", description = "通过backupPath参数删除指定备份，支持包含目录分隔符的路径")
+    public ResponseEntity<ApiResponse<String>> deleteBackupByQuery(
+            @Parameter(description = "备份路径") @RequestParam String backupPath) {
+        try {
+            backupService.deleteBackup(backupPath);
+            return ResponseEntity.ok(ApiResponse.success("备份删除成功"));
+        } catch (Exception e) {
+            log.error("删除备份失败(Query): 备份路径={}", backupPath, e);
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("删除备份失败: " + e.getMessage()));
         }
     }
     
@@ -162,8 +220,11 @@ public class BackupController {
         try {
             DataBackupService.BackupTask task = backupService.getBackupTask(taskId);
             if (task == null) {
-                return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("任务不存在: " + taskId));
+                task = buildAsyncRequestTask(taskId);
+                if (task == null) {
+                    return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("任务不存在: " + taskId));
+                }
             }
             return ResponseEntity.ok(ApiResponse.success("获取任务状态成功", task));
         } catch (Exception e) {
@@ -220,12 +281,14 @@ public class BackupController {
             // 计算最近备份时间
             LocalDateTime latestBackup = backups.stream()
                 .map(DataBackupService.BackupInfo::getCreateTime)
+                .filter(Objects::nonNull)
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
             stats.put("latestBackupTime", latestBackup);
             
-            stats.put("backupBasePath", "./backups");
-            stats.put("maxBackupSize", "10GB");
+            stats.put("backupBasePath", backupBasePath);
+            stats.put("maxBackupSize", maxBackupSize);
+            stats.put("compressionLevel", compressionLevel);
             
             return ResponseEntity.ok(ApiResponse.success("获取统计信息成功", stats));
         } catch (Exception e) {
@@ -243,18 +306,85 @@ public class BackupController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> validateBackup(
             @Parameter(description = "备份路径") @RequestParam String backupPath) {
         try {
-            // 这里应该实现备份完整性验证逻辑
+            var matched = backupService.listBackups().stream()
+                .filter(backup -> backupPath.equals(backup.getBackupPath()))
+                .findFirst();
+
+            boolean isValid = matched.map(DataBackupService.BackupInfo::getValid).orElse(false);
+            String message = matched
+                .map(backup -> Boolean.TRUE.equals(backup.getValid()) ? "备份完整性验证通过" : "备份完整性验证未通过")
+                .orElse("未找到对应备份路径");
+
             Map<String, Object> validation = new HashMap<>();
             validation.put("backupPath", backupPath);
-            validation.put("isValid", true);
+            validation.put("isValid", isValid);
             validation.put("validationTime", System.currentTimeMillis());
-            validation.put("message", "备份完整性验证通过");
+            validation.put("message", message);
             
             return ResponseEntity.ok(ApiResponse.success("验证完成", validation));
         } catch (Exception e) {
             log.error("验证备份完整性失败: 备份路径={}", backupPath, e);
             return ResponseEntity.badRequest()
                 .body(ApiResponse.error("验证失败: " + e.getMessage()));
+        }
+    }
+
+    private boolean parseBoolean(Object value, boolean defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        return Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    private DataBackupService.BackupTask buildAsyncRequestTask(String requestId) {
+        CompletableFuture<DataBackupService.BackupResult> future = asyncRequestFutures.get(requestId);
+        if (future == null) {
+            return null;
+        }
+
+        AsyncRequestMeta meta = asyncRequestMeta.get(requestId);
+        DataBackupService.BackupTask task = new DataBackupService.BackupTask();
+        task.setTaskId(requestId);
+        if (meta != null) {
+            task.setBackupName(meta.backupName);
+            task.setBackupType(meta.backupType);
+            task.setStartTime(meta.startTime);
+        }
+
+        if (!future.isDone()) {
+            task.setStatus("RUNNING");
+            task.setSuccess(null);
+            return task;
+        }
+
+        try {
+            DataBackupService.BackupResult result = future.join();
+            task.setStatus(Boolean.TRUE.equals(result.getSuccess()) ? "COMPLETED" : "FAILED");
+            task.setSuccess(result.getSuccess());
+            task.setErrorMessage(Boolean.TRUE.equals(result.getSuccess()) ? null : result.getMessage());
+            task.setEndTime(LocalDateTime.now());
+            return task;
+        } catch (CompletionException ex) {
+            task.setStatus("FAILED");
+            task.setSuccess(false);
+            task.setErrorMessage(ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
+            task.setEndTime(LocalDateTime.now());
+            return task;
+        }
+    }
+
+    private static class AsyncRequestMeta {
+        private final String backupName;
+        private final String backupType;
+        private final LocalDateTime startTime;
+
+        private AsyncRequestMeta(String backupName, String backupType, LocalDateTime startTime) {
+            this.backupName = backupName;
+            this.backupType = backupType;
+            this.startTime = startTime;
         }
     }
     
@@ -266,9 +396,9 @@ public class BackupController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> exportBackupConfig() {
         try {
             Map<String, Object> config = new HashMap<>();
-            config.put("backupBasePath", "./backups");
-            config.put("maxBackupSize", "10GB");
-            config.put("compressionLevel", 6);
+            config.put("backupBasePath", backupBasePath);
+            config.put("maxBackupSize", maxBackupSize);
+            config.put("compressionLevel", compressionLevel);
             config.put("retentionDays", 30);
             config.put("autoBackupEnabled", false);
             config.put("exportTime", System.currentTimeMillis());
