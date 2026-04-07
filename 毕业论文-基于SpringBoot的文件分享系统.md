@@ -242,7 +242,7 @@ MySQL 8 数据库
 系统支持两种部署方式：
 
 1. 本地开发部署。后端默认以 HTTPS `8443` 启动，并提供 HTTP `8080` 重定向；前端通过 Vite 在 `3000` 端口运行。
-2. Docker Compose 部署。通过 `docker-compose.yml` 一键启动 `mysql`、`minio`、`minio-init`、`backend` 和 `frontend` 五个服务，形成可运行演示环境。
+2. Docker Compose 部署。通过 `docker-compose.yml` 一键启动 `mysql`、`minio`、`backend` 和 `frontend` 四个服务，形成可运行演示环境；MinIO 桶由后端在启动时按需自动创建。
 
 这种设计兼顾了开发调试便利性与演示部署完整性。
 
