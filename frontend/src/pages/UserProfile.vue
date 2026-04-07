@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Calendar } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
-import UiStatCard from '@/components/UiStatCard.vue'
+import UiStatCard from '@/components/ui/UiStatCard.vue'
 
 const authStore = useAuthStore()
 const loading = ref(false)
