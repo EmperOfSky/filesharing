@@ -5,7 +5,7 @@ COPY pom.xml ./
 COPY src ./src
 RUN mvn -B -DskipTests clean package
 
-FROM eclipse-temurin:17.0.14_7-jre-jammy
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 RUN mkdir -p /app/uploads /app/temp /app/backups
