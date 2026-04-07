@@ -3,14 +3,24 @@ package com.filesharing.service.impl;
 import com.filesharing.dto.PreviewResponse;
 import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
+import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.FileRepository;
 import com.filesharing.service.PreviewService;
+import com.filesharing.util.FileStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +33,7 @@ import java.util.List;
 public class PreviewServiceImpl implements PreviewService {
     
     private final FileRepository fileRepository;
+    private final FileStorageUtil fileStorageUtil;
     
     @Override
     public PreviewResponse previewFile(Long fileId, User user, String deviceType, 
@@ -53,28 +64,67 @@ public class PreviewServiceImpl implements PreviewService {
     
     @Override
     public Resource getPreviewContent(Long fileId, String previewType) {
-        fileRepository.findById(fileId)
-            .orElseThrow(() -> new RuntimeException("文件不存在"));
-        
-        // 返回模拟的内容资源
-        byte[] content = "这是文件预览内容".getBytes();
-        return new ByteArrayResource(content);
+        FileEntity file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new RuntimeException("文件不存在"));
+
+        if ("image".equalsIgnoreCase(previewType)) {
+            return getImagePreview(file, null, null);
+        }
+        if ("pdf".equalsIgnoreCase(previewType)) {
+            return new ByteArrayResource(getPdfPreview(file));
+        }
+        if ("text".equalsIgnoreCase(previewType)) {
+            return new ByteArrayResource(getTextPreview(file).getBytes(StandardCharsets.UTF_8));
+        }
+
+        return resolveFileResource(file);
     }
     
     @Override
     public String getTextPreview(FileEntity file) {
-        return "这是文本文件的预览内容";
+        Resource resource = resolveFileResource(file);
+        String fileName = file.getOriginalName() == null ? "" : file.getOriginalName().toLowerCase();
+
+        if (fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
+            try {
+                return extractWordText(resource, fileName);
+            } catch (Throwable t) {
+                log.error("Word 文档文本提取失败: fileName={}, error={}", file.getOriginalName(), t.getMessage(), t);
+                return "当前 Word 文档暂无法解析，请先下载后查看。";
+            }
+        }
+
+        try (InputStream in = resource.getInputStream()) {
+            byte[] buffer = new byte[64 * 1024];
+            int read = in.read(buffer);
+            if (read <= 0) {
+                return "";
+            }
+            return new String(buffer, 0, read, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new BusinessException("读取文本预览失败: " + e.getMessage(), e);
+        }
     }
     
     @Override
     public byte[] getPdfPreview(FileEntity file) {
-        return new byte[0]; // 返回空的PDF内容
+        Resource resource = resolveFileResource(file);
+        try (InputStream in = resource.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = in.read(buffer)) != -1) {
+                out.write(buffer, 0, len);
+            }
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new BusinessException("读取PDF预览失败: " + e.getMessage(), e);
+        }
     }
     
     @Override
     public Resource getImagePreview(FileEntity file, Integer width, Integer height) {
-        byte[] imageData = new byte[0]; // 返回空的图片数据
-        return new ByteArrayResource(imageData);
+        // 当前返回原图资源；尺寸参数预留给后续缩略图优化。
+        return resolveFileResource(file);
     }
     
     @Override
@@ -144,6 +194,44 @@ public class PreviewServiceImpl implements PreviewService {
         // 记录预览日志的实现
         log.info("记录预览日志: 文件ID={}, 用户ID={}, 设备类型={}", 
                 previewRecord.getFileId(), previewRecord.getUserId(), previewRecord.getDeviceType());
+    }
+
+    private Resource resolveFileResource(FileEntity file) {
+        Resource resource = fileStorageUtil.loadAsResource(file.getStorageName(), file.getFilePath());
+        if (resource == null || !resource.exists()) {
+            throw new BusinessException("预览文件不存在");
+        }
+        return resource;
+    }
+
+    private String extractWordText(Resource resource, String fileName) {
+        try (InputStream in = resource.getInputStream()) {
+            if (fileName.endsWith(".docx")) {
+                try (XWPFDocument document = new XWPFDocument(in);
+                     XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
+                    return normalizeExtractedText(extractor.getText());
+                }
+            }
+
+            if (fileName.endsWith(".doc")) {
+                try (HWPFDocument document = new HWPFDocument(in);
+                     WordExtractor extractor = new WordExtractor(document)) {
+                    return normalizeExtractedText(extractor.getText());
+                }
+            }
+        } catch (Throwable e) {
+            throw new BusinessException("读取 Word 预览失败: " + e.getMessage(), e);
+        }
+
+        throw new BusinessException("不支持的 Word 文档类型");
+    }
+
+    private String normalizeExtractedText(String text) {
+        if (text == null) {
+            return "";
+        }
+        String normalized = text.trim();
+        return normalized.isEmpty() ? "(文档内容为空或无法提取文本)" : normalized;
     }
     
     /**

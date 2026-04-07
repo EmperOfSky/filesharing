@@ -21,7 +21,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/monitoring")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Tag(name = "系统监控", description = "系统性能监控和健康检查API")
 public class MonitoringController {
     

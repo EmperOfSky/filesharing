@@ -33,7 +33,14 @@ const navItems = computed<NavItem[]>(() => [
     title: '快传中心',
     route: '/dashboard/quick-transfer',
     icon: 'Connection',
-    match: ['/dashboard/quick-transfer', '/dashboard/files']
+    match: ['/dashboard/quick-transfer']
+  },
+  {
+    key: 'files',
+    title: '文件管理',
+    route: '/dashboard/files',
+    icon: 'FolderOpened',
+    match: ['/dashboard/files']
   },
   {
     key: 'search',
@@ -326,22 +333,25 @@ onMounted(() => {
 .nav-cluster {
   flex: 1;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .nav-pill {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 11px 15px;
+  gap: 6px;
+  padding: 8px 11px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 999px;
   background: rgba(248, 251, 255, 0.96);
   color: var(--fs-text-2);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 2;
+  white-space: nowrap;
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }

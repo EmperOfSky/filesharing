@@ -226,7 +226,11 @@ class CollaborationRealtimeClient {
     const frontendPort = window.location.port
 
     let targetPort = frontendPort
-    if ((hostname === 'localhost' || hostname === '127.0.0.1') && ['3000', '5173', '4173'].includes(frontendPort)) {
+    if (
+      (hostname === 'localhost' || hostname === '127.0.0.1')
+      && frontendPort
+      && frontendPort !== '8080'
+    ) {
       targetPort = '8080'
     }
 

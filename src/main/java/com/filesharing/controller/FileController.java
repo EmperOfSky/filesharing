@@ -36,7 +36,6 @@ import com.filesharing.util.FileStorageUtil;
 @RestController
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class FileController {
     
     private final FileService fileService;

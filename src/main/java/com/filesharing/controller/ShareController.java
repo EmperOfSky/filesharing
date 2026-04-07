@@ -35,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @RestController
 @RequestMapping("/api/shares")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class ShareController {
 
     private static final long ACCESS_TOKEN_TTL_SECONDS = 600;

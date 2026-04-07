@@ -22,7 +22,6 @@ import java.util.Map;
 @RestController
 @RequestMapping({"/api/recycle-bin", "/api/files/recycle-bin"})
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class RecycleBinController {
 
     private final RecycleBinService recycleBinService;

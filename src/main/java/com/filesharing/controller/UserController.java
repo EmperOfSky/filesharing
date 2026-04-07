@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * 用户控制器
@@ -22,8 +23,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class UserController {
+
+    private static final Pattern STRONG_PASSWORD_PATTERN =
+            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,64}$");
     
     private final UserService userService;
     private final UserRepository userRepository;
@@ -84,6 +87,11 @@ public class UserController {
             if (oldPassword == null || newPassword == null) {
                 return ResponseEntity.badRequest()
                     .body(ApiResponse.error("旧密码和新密码不能为空"));
+            }
+
+            if (!STRONG_PASSWORD_PATTERN.matcher(newPassword).matches()) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("新密码需8-64位，且包含大小写字母、数字和特殊字符"));
             }
             
             // 验证旧密码

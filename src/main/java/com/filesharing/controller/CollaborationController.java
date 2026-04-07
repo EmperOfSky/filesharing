@@ -52,7 +52,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/collaboration")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class CollaborationController {
 
     private final CollaborationService collaborationService;

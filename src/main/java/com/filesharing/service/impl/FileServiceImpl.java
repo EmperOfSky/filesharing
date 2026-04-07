@@ -10,6 +10,7 @@ import com.filesharing.entity.User;
 import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.FileRepository;
 import com.filesharing.repository.FolderRepository;
+import com.filesharing.security.FileUploadSecurityService;
 import com.filesharing.service.FileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,7 @@ public class FileServiceImpl implements FileService {
     private final FileRepository fileRepository;
     private final FolderRepository folderRepository;
     private final FileStorageUtil fileStorageUtil;
+    private final FileUploadSecurityService fileUploadSecurityService;
     private final ConcurrentMap<Long, Set<Long>> userFavoriteFileIds = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ReentrantLock> uploadLocks = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ReentrantLock> userFileQueryLocks = new ConcurrentHashMap<>();
@@ -58,6 +60,8 @@ public class FileServiceImpl implements FileService {
             if (uploader == null) {
                 throw new BusinessException("未获取到当前用户信息");
             }
+
+            fileUploadSecurityService.validateAndScan(file);
 
             Folder targetFolder = null;
             if (folderId != null) {
@@ -709,6 +713,9 @@ public class FileServiceImpl implements FileService {
      * 转换为 FileResponse
      */
     private FileResponse convertToFileResponse(FileEntity fileEntity) {
+        Long uploaderId = fileEntity.getUploader() != null ? fileEntity.getUploader().getId() : null;
+        String uploaderName = fileEntity.getUploader() != null ? fileEntity.getUploader().getUsername() : "未知用户";
+
         return FileResponse.builder()
                 .id(fileEntity.getId())
                 .originalName(fileEntity.getOriginalName())
@@ -718,15 +725,15 @@ public class FileServiceImpl implements FileService {
                 .contentType(fileEntity.getContentType())
                 .extension(fileEntity.getExtension())
                 .md5Hash(fileEntity.getMd5Hash())
-                .status(fileEntity.getStatus().name())
-                .isPublic(fileEntity.getIsPublic())
-                .downloadCount(fileEntity.getDownloadCount())
-                .previewCount(fileEntity.getPreviewCount())
-                .shareCount(fileEntity.getShareCount())
+            .status(fileEntity.getStatus() == null ? null : fileEntity.getStatus().name())
+            .isPublic(Boolean.TRUE.equals(fileEntity.getIsPublic()))
+            .downloadCount(fileEntity.getDownloadCount() == null ? 0 : fileEntity.getDownloadCount())
+            .previewCount(fileEntity.getPreviewCount() == null ? 0 : fileEntity.getPreviewCount())
+            .shareCount(fileEntity.getShareCount() == null ? 0 : fileEntity.getShareCount())
                 .lastDownloadAt(fileEntity.getLastDownloadAt())
                 .lastPreviewAt(fileEntity.getLastPreviewAt())
-                .uploaderName(fileEntity.getUploader().getUsername())
-                .uploaderId(fileEntity.getUploader().getId())
+            .uploaderName(uploaderName)
+            .uploaderId(uploaderId)
                 .folderId(fileEntity.getFolder() != null ? fileEntity.getFolder().getId() : null)
                 .folderName(fileEntity.getFolder() != null ? fileEntity.getFolder().getName() : null)
                 .createdAt(fileEntity.getCreatedAt())

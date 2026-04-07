@@ -26,7 +26,6 @@ import java.util.*;
 @RestController
 @RequestMapping({"/api/admin/quick-transfer", "/api/admin/fcb"})
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Validated
 public class FileCodeBoxAdminController {
 

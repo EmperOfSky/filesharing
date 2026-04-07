@@ -18,11 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.security.MessageDigest;
@@ -251,15 +255,29 @@ public class DataBackupService {
      * 恢复数据
      */
     public RestoreResult restoreFromBackup(String backupPath, boolean restoreFiles) {
+        Path safeBackupDir = resolveSafeBackupPath(backupPath);
         String taskId = UUID.randomUUID().toString();
-        RestoreTask task = new RestoreTask(taskId, backupPath);
+        RestoreTask task = new RestoreTask(taskId, safeBackupDir.toString());
         task.setStatus("RUNNING");
         task.setStartTime(LocalDateTime.now());
+
+        // 持久化恢复任务状态，确保前端可通过 taskId 查询到进度/结果
+        BackupTaskEntity entity = new BackupTaskEntity();
+        entity.setTaskId(taskId);
+        entity.setBackupName(safeBackupDir.getFileName() == null
+            ? safeBackupDir.toString()
+            : safeBackupDir.getFileName().toString());
+        entity.setBackupType("RESTORE");
+        entity.setStatus("RUNNING");
+        entity.setStartTime(task.getStartTime());
+        entity.setDbBackupPath(safeBackupDir.resolve("database.json").toString());
+        entity.setFilesBackupPath(safeBackupDir.resolve("files.zip").toString());
+        backupTaskRepository.save(entity);
         
         try {
-            Path backupDir = Paths.get(backupPath);
+            Path backupDir = safeBackupDir;
             if (!Files.exists(backupDir)) {
-                throw new BusinessException("备份目录不存在: " + backupPath);
+                throw new BusinessException("备份目录不存在: " + safeBackupDir);
             }
             
             // 读取元数据
@@ -300,8 +318,13 @@ public class DataBackupService {
             task.setStatus("COMPLETED");
             task.setEndTime(LocalDateTime.now());
             task.setSuccess(true);
+
+            entity.setStatus("COMPLETED");
+            entity.setEndTime(task.getEndTime());
+            entity.setSuccess(true);
+            backupTaskRepository.save(entity);
             
-            log.info("数据恢复成功: 任务ID={}, 备份路径={}", taskId, backupPath);
+            log.info("数据恢复成功: 任务ID={}, 备份路径={}", taskId, safeBackupDir);
             
             return new RestoreResult(taskId, true, "数据恢复成功");
             
@@ -310,8 +333,14 @@ public class DataBackupService {
             task.setEndTime(LocalDateTime.now());
             task.setSuccess(false);
             task.setErrorMessage(e.getMessage());
+
+            entity.setStatus("FAILED");
+            entity.setEndTime(task.getEndTime());
+            entity.setSuccess(false);
+            entity.setErrorMessage(e.getMessage());
+            backupTaskRepository.save(entity);
             
-            log.error("数据恢复失败: 任务ID={}, 备份路径={}, 错误={}", taskId, backupPath, e.getMessage(), e);
+            log.error("数据恢复失败: 任务ID={}, 备份路径={}, 错误={}", taskId, safeBackupDir, e.getMessage(), e);
             throw new BusinessException("数据恢复失败: " + e.getMessage());
         }
     }
@@ -422,8 +451,12 @@ public class DataBackupService {
                     Object uploaderObj = fMap.get("uploader");
                     if (uploaderObj instanceof Map) {
                         Map<?,?> up = (Map<?,?>) uploaderObj;
+                        Object idObj = up.get("id");
                         String username = (String) up.get("username");
                         String email = (String) up.get("email");
+                        if (idObj instanceof Number) {
+                            uploader = userRepository.findById(((Number) idObj).longValue()).orElse(null);
+                        }
                         if (username != null) uploader = userRepository.findByUsername(username).orElse(null);
                         if (uploader == null && email != null) uploader = userRepository.findByEmail(email).orElse(null);
                     }
@@ -511,7 +544,7 @@ public class DataBackupService {
      */
     public void deleteBackup(String backupPath) {
         try {
-            Path backupDir = Paths.get(backupPath);
+            Path backupDir = resolveSafeBackupPath(backupPath);
             if (Files.exists(backupDir)) {
                 // 递归删除备份目录
                 Files.walk(backupDir)
@@ -523,11 +556,28 @@ public class DataBackupService {
                             log.warn("删除文件失败: {}", path, e);
                         }
                     });
-                log.info("备份删除成功: {}", backupPath);
+                log.info("备份删除成功: {}", backupDir);
             }
         } catch (Exception e) {
             log.error("删除备份失败: {}", backupPath, e);
             throw new BusinessException("删除备份失败: " + e.getMessage());
+        }
+    }
+
+    private Path resolveSafeBackupPath(String backupPath) {
+        if (backupPath == null || backupPath.isBlank()) {
+            throw new BusinessException("备份路径不能为空");
+        }
+
+        try {
+            Path backupRoot = Paths.get(backupBasePath).toAbsolutePath().normalize();
+            Path candidate = Paths.get(backupPath).toAbsolutePath().normalize();
+            if (!candidate.startsWith(backupRoot)) {
+                throw new BusinessException("非法备份路径");
+            }
+            return candidate;
+        } catch (InvalidPathException e) {
+            throw new BusinessException("非法备份路径");
         }
     }
     
@@ -612,16 +662,22 @@ public class DataBackupService {
     }
     
     private void backupDatabase(Path outputFile) throws IOException {
-        // 备份用户数据
+        // 备份用户数据（导出为可序列化快照，避免直接序列化实体导致懒加载/循环引用问题）
         List<User> users = userRepository.findAll();
+        List<Map<String, Object>> userSnapshots = users.stream()
+            .map(this::toUserSnapshot)
+            .collect(Collectors.toList());
         Map<String, Object> userData = new HashMap<>();
-        userData.put("users", users);
+        userData.put("users", userSnapshots);
         userData.put("exportTime", LocalDateTime.now());
         
-        // 备份文件数据
+        // 备份文件数据（导出为扁平快照，避免实体图序列化风险）
         List<FileEntity> files = fileRepository.findAll();
+        List<Map<String, Object>> fileSnapshots = files.stream()
+            .map(this::toFileSnapshot)
+            .collect(Collectors.toList());
         Map<String, Object> fileData = new HashMap<>();
-        fileData.put("files", files);
+        fileData.put("files", fileSnapshots);
         fileData.put("exportTime", LocalDateTime.now());
         
         // 合并数据
@@ -629,8 +685,8 @@ public class DataBackupService {
         backupData.put("userData", userData);
         backupData.put("fileData", fileData);
         backupData.put("version", "1.0");
-        
-        objectMapper.writeValue(outputFile.toFile(), backupData);
+
+        writeJsonAtomically(outputFile, backupData);
     }
     
     private void backupIncrementalDatabase(Path outputFile, LocalDateTime sinceTime) throws IOException {
@@ -638,8 +694,11 @@ public class DataBackupService {
         Iterable<User> usersIterable = userRepository.findByCreatedAtAfter(sinceTime);
         List<User> users = new ArrayList<>();
         usersIterable.forEach(users::add);
+        List<Map<String, Object>> userSnapshots = users.stream()
+            .map(this::toUserSnapshot)
+            .collect(Collectors.toList());
         Map<String, Object> userData = new HashMap<>();
-        userData.put("users", users);
+        userData.put("users", userSnapshots);
         userData.put("exportTime", LocalDateTime.now());
         userData.put("sinceTime", sinceTime);
         
@@ -647,8 +706,11 @@ public class DataBackupService {
         Iterable<FileEntity> filesIterable = fileRepository.findByCreatedAtAfter(sinceTime);
         List<FileEntity> files = new ArrayList<>();
         filesIterable.forEach(files::add);
+        List<Map<String, Object>> fileSnapshots = files.stream()
+            .map(this::toFileSnapshot)
+            .collect(Collectors.toList());
         Map<String, Object> fileData = new HashMap<>();
-        fileData.put("files", files);
+        fileData.put("files", fileSnapshots);
         fileData.put("exportTime", LocalDateTime.now());
         fileData.put("sinceTime", sinceTime);
         
@@ -658,8 +720,8 @@ public class DataBackupService {
         backupData.put("fileData", fileData);
         backupData.put("version", "1.0");
         backupData.put("incremental", true);
-        
-        objectMapper.writeValue(outputFile.toFile(), backupData);
+
+        writeJsonAtomically(outputFile, backupData);
     }
     
     private long backupFiles(Path outputFile) throws IOException {
@@ -755,7 +817,7 @@ public class DataBackupService {
         if (includeFiles) {
             List<FileEntity> files = fileRepository.findAll();
             metadata.setFileCount((long) files.size());
-            long totalSize = files.stream().mapToLong(FileEntity::getFileSize).sum();
+            long totalSize = files.stream().mapToLong(f -> f.getFileSize() == null ? 0L : f.getFileSize()).sum();
             metadata.setTotalFileSize(totalSize);
         }
         
@@ -776,10 +838,68 @@ public class DataBackupService {
         List<FileEntity> files = new ArrayList<>();
         filesIterable.forEach(files::add);
         metadata.setFileCount((long) files.size());
-        long totalSize = files.stream().mapToLong(FileEntity::getFileSize).sum();
+        long totalSize = files.stream().mapToLong(f -> f.getFileSize() == null ? 0L : f.getFileSize()).sum();
         metadata.setTotalFileSize(totalSize);
         
         return metadata;
+    }
+
+    private void writeJsonAtomically(Path outputFile, Object payload) throws IOException {
+        Path parent = outputFile.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Path tmpFile = outputFile.resolveSibling(outputFile.getFileName() + ".tmp");
+        objectMapper.writeValue(tmpFile.toFile(), payload);
+        try {
+            Files.move(tmpFile, outputFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException ex) {
+            // Windows/文件系统不支持原子移动时降级为普通替换，避免备份任务整体失败。
+            Files.move(tmpFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private Map<String, Object> toUserSnapshot(User user) {
+        Map<String, Object> snapshot = new HashMap<>();
+        snapshot.put("id", user.getId());
+        snapshot.put("username", user.getUsername());
+        snapshot.put("email", user.getEmail());
+        snapshot.put("nickname", user.getNickname());
+        snapshot.put("avatar", user.getAvatar());
+        snapshot.put("storageQuota", user.getStorageQuota());
+        snapshot.put("usedStorage", user.getUsedStorage());
+        snapshot.put("status", user.getStatus() == null ? null : user.getStatus().name());
+        snapshot.put("role", user.getRole() == null ? null : user.getRole().name());
+        snapshot.put("createdAt", user.getCreatedAt());
+        snapshot.put("updatedAt", user.getUpdatedAt());
+        return snapshot;
+    }
+
+    private Map<String, Object> toFileSnapshot(FileEntity file) {
+        Map<String, Object> snapshot = new HashMap<>();
+        snapshot.put("id", file.getId());
+        snapshot.put("originalName", file.getOriginalName());
+        snapshot.put("storageName", file.getStorageName());
+        snapshot.put("filePath", file.getFilePath());
+        snapshot.put("fileSize", file.getFileSize());
+        snapshot.put("contentType", file.getContentType());
+        snapshot.put("extension", file.getExtension());
+        snapshot.put("md5Hash", file.getMd5Hash());
+        snapshot.put("status", file.getStatus() == null ? null : file.getStatus().name());
+        snapshot.put("isPublic", file.getIsPublic());
+        snapshot.put("downloadCount", file.getDownloadCount());
+        snapshot.put("previewCount", file.getPreviewCount());
+        snapshot.put("shareCount", file.getShareCount());
+        snapshot.put("createdAt", file.getCreatedAt());
+        snapshot.put("updatedAt", file.getUpdatedAt());
+        snapshot.put("deletedAt", file.getDeletedAt());
+
+        if (file.getUploader() != null) {
+            Map<String, Object> uploader = new HashMap<>();
+            uploader.put("id", file.getUploader().getId());
+            snapshot.put("uploader", uploader);
+        }
+        return snapshot;
     }
     
     private String computeSHA256(Path file) throws IOException {

@@ -4,6 +4,7 @@ import com.filesharing.entity.FileEntity;
 import com.filesharing.entity.User;
 import com.filesharing.repository.FileRepository;
 import com.filesharing.repository.UserRepository;
+import com.filesharing.security.FileUploadSecurityService;
 import com.filesharing.util.FileStorageUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
+import java.util.regex.Pattern;
 
 @Slf4j
 
@@ -39,6 +41,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/upload")
 @RequiredArgsConstructor
 public class ChunkUploadController {
+
+    private static final Pattern UPLOAD_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9-]{8,64}$");
 
     @Value("${file.upload.temp-path:./temp/}")
     private String tempBasePath;
@@ -50,12 +54,13 @@ public class ChunkUploadController {
     @Value("${upload.file.max-size:10737418240}") // 默认 10GB
     private long fileMaxSize;
 
-    @Value("${upload.allowed-types:}")
+    @Value("${upload.allowed-types-csv:}")
     private String allowedTypesCsv;
 
     private final FileRepository fileRepository;
     private final UserRepository userRepository;
     private final FileStorageUtil fileStorageUtil;
+    private final FileUploadSecurityService fileUploadSecurityService;
 
     /**
      * 初始化分片上传，返回 uploadId 和已存在分片索引（支持断点续传）
@@ -73,9 +78,10 @@ public class ChunkUploadController {
 
         if (uploadId == null || uploadId.isBlank()) {
             uploadId = UUID.randomUUID().toString();
+        } else {
+            validateUploadId(uploadId);
         }
-        Path uploadDir = Paths.get(tempBasePath).toAbsolutePath().normalize().resolve(uploadId);
-        Files.createDirectories(uploadDir);
+        Path uploadDir = resolveUploadDir(uploadId, true);
 
         // 列出已有的分片索引，便于客户端断点续传
         Set<Integer> existing = new TreeSet<>();
@@ -130,8 +136,8 @@ public class ChunkUploadController {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "分片大小超出限制: " + chunkMaxSize);
         }
 
-        Path uploadDir = Paths.get(tempBasePath).toAbsolutePath().normalize().resolve(uploadId);
-        if (!Files.exists(uploadDir)) {
+        Path uploadDir = resolveUploadDir(uploadId, false);
+        if (uploadDir == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "uploadId not found"));
         }
 
@@ -172,8 +178,8 @@ public class ChunkUploadController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "找不到当前用户");
         }
 
-        Path uploadDir = Paths.get(tempBasePath).toAbsolutePath().normalize().resolve(uploadId);
-        if (!Files.exists(uploadDir) || !Files.isDirectory(uploadDir)) {
+        Path uploadDir = resolveUploadDir(uploadId, false);
+        if (uploadDir == null || !Files.isDirectory(uploadDir)) {
             return ResponseEntity.badRequest().body(Map.of("error", "uploadId not found"));
         }
 
@@ -207,6 +213,7 @@ public class ChunkUploadController {
 
         // 合并后校验总大小
         long fileSize = Files.size(mergedTempFile);
+        fileUploadSecurityService.validateBasic(filename, fileSize, contentType);
         if (fileSize > fileMaxSize) {
             try { Files.deleteIfExists(mergedTempFile); } catch (IOException ignored) {}
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "文件大小超出限制: " + fileMaxSize);
@@ -220,6 +227,10 @@ public class ChunkUploadController {
                 try { Files.deleteIfExists(mergedTempFile); } catch (IOException ignored) {}
                 throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "不允许的文件类型: " + contentType);
             }
+        }
+
+        try (InputStream mergedInputForScan = Files.newInputStream(mergedTempFile)) {
+            fileUploadSecurityService.validateAndScan(filename, fileSize, contentType, mergedInputForScan);
         }
 
         // 计算 SHA-256 返回给客户端，便于校验
@@ -262,9 +273,11 @@ public class ChunkUploadController {
         fileRepository.save(fe);
 
         // 清理临时目录
-        Files.list(uploadDir).forEach(p -> {
-            try { Files.deleteIfExists(p); } catch (IOException ignored) {}
-        });
+        try (Stream<Path> uploadFiles = Files.list(uploadDir)) {
+            uploadFiles.forEach(p -> {
+                try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+            });
+        }
         try { Files.deleteIfExists(uploadDir); } catch (IOException ignored) {}
 
         Map<String, String> resp = new HashMap<>();
@@ -293,5 +306,30 @@ public class ChunkUploadController {
         } catch (NoSuchAlgorithmException e) {
             throw new IOException(e);
         }
+    }
+
+    private void validateUploadId(String uploadId) {
+        if (uploadId == null || !UPLOAD_ID_PATTERN.matcher(uploadId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "非法的 uploadId");
+        }
+    }
+
+    private Path resolveUploadDir(String uploadId, boolean createIfMissing) throws IOException {
+        validateUploadId(uploadId);
+
+        Path root = Paths.get(tempBasePath).toAbsolutePath().normalize();
+        Files.createDirectories(root);
+
+        Path uploadDir = root.resolve(uploadId).normalize();
+        if (!uploadDir.startsWith(root)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "非法上传路径");
+        }
+
+        if (createIfMissing) {
+            Files.createDirectories(uploadDir);
+            return uploadDir;
+        }
+
+        return Files.exists(uploadDir) ? uploadDir : null;
     }
 }

@@ -36,7 +36,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Validated
 public class FileCodeBoxController {
 

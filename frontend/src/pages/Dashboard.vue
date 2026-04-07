@@ -20,7 +20,7 @@ const stats = ref({
 
 const quickActions =[
   { title: '快传中心', route: '/dashboard/quick-transfer', icon: 'Connection', tone: 'sky' },
-  { title: '文件管理', route: '/dashboard/files', icon: 'FolderOpened', tone: 'kelp' },
+  { title: '文件管理', route: '/dashboard/files', icon: 'FolderOpened', tone: 'sky' },
   { title: '资源搜索', route: '/dashboard/search', icon: 'Search', tone: 'sand' },
   { title: '协作项目', route: '/dashboard/collaboration', icon: 'EditPen', tone: 'ink' }
 ]
@@ -118,7 +118,8 @@ onMounted(() => {
             <el-button color="#0ea5e9" type="primary" size="large" @click="go('/dashboard/quick-transfer')" round>
               <el-icon class="el-icon--left"><Connection /></el-icon>快传中心
             </el-button>
-            <el-button size="large" @click="go('/dashboard/files')" round plain>
+            <el-button color="#0ea5e9" type="primary" size="large" @click="go('/dashboard/files')" round>
+              <el-icon class="el-icon--left"><FolderOpened /></el-icon>
               文件管理
             </el-button>
           </div>

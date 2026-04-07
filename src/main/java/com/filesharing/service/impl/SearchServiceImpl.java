@@ -45,25 +45,28 @@ public class SearchServiceImpl implements SearchService {
     public SearchResponse searchFiles(SearchRequest request, User user, String clientIp, String userAgent) {
         long start = System.currentTimeMillis();
 
-        int page = Math.max(request.getPage() == null ? 0 : request.getPage(), 0);
-        int size = Math.max(request.getSize() == null ? 10 : request.getSize(), 1);
+        SearchRequest safeRequest = request == null ? new SearchRequest() : request;
+        String keyword = safeRequest.getKeyword() == null ? "" : safeRequest.getKeyword().trim();
+
+        int page = Math.max(safeRequest.getPage() == null ? 0 : safeRequest.getPage(), 0);
+        int size = Math.max(safeRequest.getSize() == null ? 10 : safeRequest.getSize(), 1);
 
         Page<SearchResult> pageResult;
-        SearchRequest.SearchType searchType = request.getSearchType() == null
+        SearchRequest.SearchType searchType = safeRequest.getSearchType() == null
             ? SearchRequest.SearchType.ALL
-            : request.getSearchType();
+            : safeRequest.getSearchType();
 
         switch (searchType) {
             case FILENAME:
-            pageResult = searchByFileName(request.getKeyword(), user, page, size);
+            pageResult = searchByFileName(keyword, user, page, size);
             break;
             case CONTENT:
-            pageResult = searchByContent(request.getKeyword(), user, page, size);
+            pageResult = searchByContent(keyword, user, page, size);
             break;
             case ALL:
             case TAG:
             default:
-            pageResult = advancedSearch(request, user, page, size);
+            pageResult = advancedSearch(safeRequest, user, page, size);
             break;
         }
 
@@ -71,28 +74,38 @@ public class SearchServiceImpl implements SearchService {
             .map(this::toResponseResult)
             .collect(Collectors.toList());
 
-        List<SearchResponse.Suggestion> suggestions = getSearchSuggestions(request.getKeyword(), user).stream()
-            .limit(5)
-            .map(s -> SearchResponse.Suggestion.builder()
-                .keyword(s)
-                .resultCount(0L)
-                .type("keyword")
-                .build())
-            .collect(Collectors.toList());
+        List<SearchResponse.Suggestion> suggestions;
+        try {
+            suggestions = getSearchSuggestions(keyword, user).stream()
+                .limit(5)
+                .map(s -> SearchResponse.Suggestion.builder()
+                    .keyword(s)
+                    .resultCount(0L)
+                    .type("keyword")
+                    .build())
+                .collect(Collectors.toList());
+        } catch (Exception ex) {
+            log.warn("构建搜索建议失败，已降级为空建议列表: {}", ex.getMessage());
+            suggestions = new ArrayList<>();
+        }
 
         long duration = System.currentTimeMillis() - start;
 
-        SearchRecord record = new SearchRecord();
-        record.setSearchKeyword(request.getKeyword());
-        record.setUser(user);
-        record.setSearchType(toEntitySearchType(searchType));
-        record.setResultCount((int) pageResult.getTotalElements());
-        record.setSearchDuration(duration);
-        record.setHasFilters(hasFilters(request));
-        record.setFilterConditions(buildFilterSummary(request));
-        record.setClientIp(clientIp);
-        record.setUserAgent(userAgent);
-        searchRecordRepository.save(record);
+        try {
+            SearchRecord record = new SearchRecord();
+            record.setSearchKeyword(keyword);
+            record.setUser(user);
+            record.setSearchType(toEntitySearchType(searchType));
+            record.setResultCount((int) pageResult.getTotalElements());
+            record.setSearchDuration(duration);
+            record.setHasFilters(hasFilters(safeRequest));
+            record.setFilterConditions(buildFilterSummary(safeRequest));
+            record.setClientIp(clientIp);
+            record.setUserAgent(userAgent);
+            searchRecordRepository.save(record);
+        } catch (Exception ex) {
+            log.warn("保存搜索记录失败，不影响本次搜索结果返回: {}", ex.getMessage());
+        }
 
         SearchResponse response = new SearchResponse();
         response.setResults(responseResults);
@@ -100,12 +113,12 @@ public class SearchServiceImpl implements SearchService {
         response.setCurrentPage(pageResult.getNumber());
         response.setTotalPages(pageResult.getTotalPages());
         response.setSearchDuration(duration);
-        response.setSearchKeyword(request.getKeyword());
+        response.setSearchKeyword(keyword);
         response.setSearchType(searchType.name());
         response.setSuggestions(suggestions);
 
         log.info("执行搜索：关键词={}, 用户={}, 结果={}, 耗时={}ms",
-            request.getKeyword(), user.getUsername(), pageResult.getTotalElements(), duration);
+            keyword, user == null ? "anonymous" : user.getUsername(), pageResult.getTotalElements(), duration);
         return response;
     }
     

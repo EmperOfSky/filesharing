@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Validated
 public class LegacyAdminCompatController {
 

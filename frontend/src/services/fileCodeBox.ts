@@ -19,6 +19,24 @@ interface FileCodeBoxPresignInitResult {
   expires_in: number
 }
 
+export interface FileCodeBoxChunkInitResult {
+  upload_id: string
+  chunk_size: number
+  total_chunks: number
+  uploaded_chunks: number[]
+  existed?: boolean
+}
+
+export interface FileCodeBoxChunkStatusResult {
+  upload_id: string
+  file_name: string
+  file_size: number
+  chunk_size: number
+  total_chunks: number
+  uploaded_chunks: number[]
+  progress: number
+}
+
 export interface FileCodeBoxRecordItem {
   id: number
   code: string
@@ -123,6 +141,43 @@ class FileCodeBoxService {
       expire_value: expireValue,
       expire_style: expireStyle
     })
+  }
+
+  async initChunkUpload(
+    fileName: string,
+    fileSize: number,
+    chunkSize = 5 * 1024 * 1024,
+    expireValue = 1,
+    expireStyle = 'day'
+  ): Promise<FileCodeBoxChunkInitResult> {
+    return http.post<FileCodeBoxChunkInitResult>('/chunk/upload/init', {
+      file_name: fileName,
+      file_size: fileSize,
+      chunk_size: chunkSize,
+      expire_value: expireValue,
+      expire_style: expireStyle
+    })
+  }
+
+  async uploadChunk(uploadId: string, chunkIndex: number, chunk: Blob): Promise<{ chunk_hash: string; skipped?: boolean }> {
+    const form = new FormData()
+    form.append('chunk', chunk)
+    return http.post<{ chunk_hash: string; skipped?: boolean }>(`/chunk/upload/chunk/${uploadId}/${chunkIndex}`, form)
+  }
+
+  async getChunkUploadStatus(uploadId: string): Promise<FileCodeBoxChunkStatusResult> {
+    return http.get<FileCodeBoxChunkStatusResult>(`/chunk/upload/status/${uploadId}`)
+  }
+
+  async completeChunkUpload(uploadId: string, expireValue = 1, expireStyle = 'day'): Promise<FileCodeBoxShareResult> {
+    return http.post<FileCodeBoxShareResult>(`/chunk/upload/complete/${uploadId}`, {
+      expire_value: expireValue,
+      expire_style: expireStyle
+    })
+  }
+
+  async cancelChunkUpload(uploadId: string): Promise<Record<string, unknown>> {
+    return http.delete<Record<string, unknown>>(`/chunk/upload/${uploadId}`)
   }
 
   async getAdminConfig(): Promise<FileCodeBoxAdminConfig> {

@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import QRCode from 'qrcode'
-import { UploadFilled, Document, Clock, Connection, Check, CopyDocument, TopRight } from '@element-plus/icons-vue'
+import { UploadFilled, Document, Clock, Connection, Check, CopyDocument, TopRight, Bottom } from '@element-plus/icons-vue'
 import fileCodeBoxService, {
   type FileCodeBoxSelectResult,
   type FileCodeBoxShareResult
@@ -13,7 +13,7 @@ interface SendHistoryItem {
   id: string
   code: string
   name?: string
-  kind: 'text' | 'file' | 'presign'
+  kind: 'text' | 'file' | 'chunk' | 'presign'
   createdAt: string
 }
 
@@ -33,10 +33,11 @@ const SEND_HISTORY_KEY = 'fcb_send_history'
 const PICKUP_HISTORY_KEY = 'fcb_pickup_history'
 const PICKUP_CODE_LENGTH = 32
 
-const activeTab = ref<'text' | 'file' | 'presign' | 'select'>('text')
+const activeTab = ref<'text' | 'file' | 'chunk' | 'presign' | 'select'>('text')
 
 const sharing = ref(false)
 const selecting = ref(false)
+const chunkUploading = ref(false)
 const presignUploading = ref(false)
 const sendHistoryVisible = ref(false)
 const pickupHistoryVisible = ref(false)
@@ -48,6 +49,12 @@ const textExpireValue = ref(1)
 const fileExpireStyle = ref('day')
 const fileExpireValue = ref(1)
 const fileToShare = ref<File | null>(null)
+
+const chunkFile = ref<File | null>(null)
+const chunkExpireStyle = ref('day')
+const chunkExpireValue = ref(1)
+const chunkProgress = ref(0)
+const chunkUploadId = ref('')
 
 const pickupCode = ref('')
 const selected = ref<FileCodeBoxSelectResult | null>(null)
@@ -154,6 +161,7 @@ const modeLabel = computed(() => {
   const labels: Record<typeof activeTab.value, string> = {
     text: '文本快传',
     file: '文件快传',
+    chunk: '分片上传',
     presign: '直传上传',
     select: '取件验证'
   }
@@ -267,6 +275,67 @@ const onFileShare = async () => {
     ElMessage.error(message)
   } finally {
     sharing.value = false
+  }
+}
+
+const onChunkFilePicked = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  chunkFile.value = input.files?.[0] || null
+}
+
+const onChunkShare = async () => {
+  if (!chunkFile.value) {
+    ElMessage.warning('请先选择要分片上传的文件')
+    return
+  }
+
+  const chunkSize = 5 * 1024 * 1024
+  try {
+    chunkUploading.value = true
+    chunkProgress.value = 0
+
+    const initResult = await fileCodeBoxService.initChunkUpload(
+      chunkFile.value.name,
+      chunkFile.value.size,
+      chunkSize,
+      chunkExpireValue.value,
+      chunkExpireStyle.value
+    )
+
+    chunkUploadId.value = initResult.upload_id
+    const uploadedSet = new Set<number>(initResult.uploaded_chunks || [])
+    const totalChunks = initResult.total_chunks
+    const effectiveChunkSize = initResult.chunk_size || chunkSize
+
+    for (let index = 0; index < totalChunks; index += 1) {
+      if (!uploadedSet.has(index)) {
+        const start = index * effectiveChunkSize
+        const end = Math.min(chunkFile.value.size, start + effectiveChunkSize)
+        const part = chunkFile.value.slice(start, end)
+        await fileCodeBoxService.uploadChunk(initResult.upload_id, index, part)
+        uploadedSet.add(index)
+      }
+
+      chunkProgress.value = Math.round((uploadedSet.size / totalChunks) * 100)
+    }
+
+    const status = await fileCodeBoxService.getChunkUploadStatus(initResult.upload_id)
+    chunkProgress.value = Math.round(status.progress)
+
+    lastShareResult.value = await fileCodeBoxService.completeChunkUpload(
+      initResult.upload_id,
+      chunkExpireValue.value,
+      chunkExpireStyle.value
+    )
+
+    chunkProgress.value = 100
+    pushSendHistory(lastShareResult.value, 'chunk')
+    ElMessage.success(`分片上传完成，取件码：${lastShareResult.value.code}`)
+  } catch (error: any) {
+    const message = error?.response?.data?.data || error?.response?.data?.message || error?.message || '分片上传失败'
+    ElMessage.error(message)
+  } finally {
+    chunkUploading.value = false
   }
 }
 
@@ -396,6 +465,7 @@ onMounted(() => {
           <el-tabs v-model="activeTab" class="custom-tabs">
             <el-tab-pane label="文本快传" name="text"></el-tab-pane>
             <el-tab-pane label="文件快传" name="file"></el-tab-pane>
+            <el-tab-pane label="分片上传" name="chunk"></el-tab-pane>
             <el-tab-pane label="直传上传" name="presign"></el-tab-pane>
             <el-tab-pane label="取件验证" name="select"></el-tab-pane>
           </el-tabs>
@@ -453,6 +523,36 @@ onMounted(() => {
                 <el-button type="primary" size="large" class="submit-btn" :loading="sharing" @click="onFileShare">
                   <el-icon class="el-icon--left"><Document /></el-icon> 创建文件快传
                 </el-button>
+              </div>
+
+              <!-- Chunk Share -->
+              <div v-else-if="activeTab === 'chunk'" class="form-panel">
+                <label class="modern-dropzone" :class="{ 'has-file': chunkFile }">
+                  <input type="file" @change="onChunkFilePicked" hidden />
+                  <el-icon class="dropzone-icon"><UploadFilled /></el-icon>
+                  <strong class="dropzone-title">{{ chunkFile ? chunkFile.name : '选择要分片上传的大文件' }}</strong>
+                  <span class="dropzone-desc">{{ chunkFile ? formatSize(chunkFile.size) : '默认 5MB 分片，支持断点续传' }}</span>
+                </label>
+                <div class="settings-row">
+                  <div class="setting-item">
+                    <span class="setting-label"><el-icon><Clock /></el-icon> 过期策略</span>
+                    <el-select v-model="chunkExpireStyle" class="full-width">
+                      <el-option v-for="item in expireStyles" :key="item" :label="item" :value="item" />
+                    </el-select>
+                  </div>
+                  <div class="setting-item">
+                    <span class="setting-label">有效数值</span>
+                    <el-input-number v-model="chunkExpireValue" :min="1" class="full-width" />
+                  </div>
+                </div>
+                <el-button type="primary" size="large" class="submit-btn" :loading="chunkUploading" @click="onChunkShare">
+                  开始分片上传
+                </el-button>
+                <div v-if="chunkUploading || chunkProgress > 0" class="status-alert">
+                  <strong>上传进度：{{ chunkProgress }}%</strong>
+                  <p v-if="chunkUploadId">会话ID：{{ chunkUploadId }}</p>
+                  <el-progress :percentage="chunkProgress" :stroke-width="12" status="success" />
+                </div>
               </div>
 
               <!-- Presign Share -->

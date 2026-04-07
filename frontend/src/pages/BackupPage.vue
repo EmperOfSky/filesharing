@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import backupService from '@/services/backup'
 import type { BackupConfig, BackupInfo, BackupStatistics, BackupTask, BackupType } from '@/types'
@@ -13,6 +13,7 @@ const configDialogVisible = ref(false)
 
 const backups = ref<BackupInfo[]>([])
 const currentTask = ref<BackupTask | null>(null)
+const taskPollingTimer = ref<number | null>(null)
 const statistics = ref<BackupStatistics>({
   totalBackups: 0,
   totalBackupSize: 0,
@@ -38,6 +39,20 @@ const configForm = reactive<BackupConfig>({
 const validCount = computed(() => backups.value.filter((item) => item.valid).length)
 const backupReadiness = computed(() => (configForm.backupBasePath ? '可执行' : '待配置'))
 const recoveryStatus = computed(() => (validCount.value > 0 ? '可恢复' : '暂无可恢复'))
+const taskStatusText = computed(() => {
+  const status = String(currentTask.value?.status || '').toUpperCase()
+  if (status === 'RUNNING' || status === 'PENDING') return '备份中'
+  if (status === 'COMPLETED') return '已完成'
+  if (status === 'FAILED') return '失败'
+  return currentTask.value?.status || '--'
+})
+const taskStatusTagType = computed(() => {
+  const status = String(currentTask.value?.status || '').toUpperCase()
+  if (status === 'RUNNING' || status === 'PENDING') return 'warning'
+  if (status === 'COMPLETED') return 'success'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+})
 
 const formatDateTime = (value?: string) => {
   if (!value) return '--'
@@ -117,14 +132,58 @@ const createBackup = async () => {
 }
 
 const refreshTask = async () => {
+  await refreshTaskInternal(true)
+}
+
+const refreshTaskInternal = async (showError: boolean) => {
   if (!currentTask.value?.taskId) return
   try {
     currentTask.value = await backupService.getBackupTaskStatus(currentTask.value.taskId)
   } catch (error: any) {
-    const message = error?.response?.data?.message || error?.message || '刷新任务状态失败'
-    ElMessage.error(message)
+    if (showError) {
+      const message = error?.response?.data?.message || error?.message || '刷新任务状态失败'
+      ElMessage.error(message)
+    }
   }
 }
+
+const stopTaskPolling = () => {
+  if (taskPollingTimer.value !== null) {
+    window.clearInterval(taskPollingTimer.value)
+    taskPollingTimer.value = null
+  }
+}
+
+const startTaskPolling = () => {
+  if (!currentTask.value?.taskId) return
+  stopTaskPolling()
+  taskPollingTimer.value = window.setInterval(() => {
+    void refreshTaskInternal(false)
+  }, 2000)
+}
+
+watch(
+  () => currentTask.value?.status,
+  (status, prevStatus) => {
+    const curr = String(status || '').toUpperCase()
+    const prev = String(prevStatus || '').toUpperCase()
+    const running = curr === 'RUNNING' || curr === 'PENDING'
+
+    if (running) {
+      startTaskPolling()
+      return
+    }
+
+    stopTaskPolling()
+    if ((prev === 'RUNNING' || prev === 'PENDING') && curr === 'FAILED' && currentTask.value?.errorMessage) {
+      ElMessage.error(currentTask.value.errorMessage)
+    }
+
+    if ((prev === 'RUNNING' || prev === 'PENDING') && curr) {
+      void refreshAll()
+    }
+  }
+)
 
 const validateBackup = async (item: BackupInfo) => {
   try {
@@ -208,6 +267,10 @@ const saveConfig = async () => {
 onMounted(() => {
   refreshAll()
 })
+
+onUnmounted(() => {
+  stopTaskPolling()
+})
 </script>
 
 <template>
@@ -268,10 +331,13 @@ onMounted(() => {
           </div>
           <div v-if="currentTask" class="status-grid">
             <div class="stat-mini"><span>ID</span><strong>{{ currentTask.taskId }}</strong></div>
-            <div class="stat-mini"><span>状态</span><el-tag round size="small">{{ currentTask.status }}</el-tag></div>
+            <div class="stat-mini"><span>状态</span><el-tag round size="small" :type="taskStatusTagType">{{ taskStatusText }}</el-tag></div>
             <div class="stat-mini"><span>类型</span><strong>{{ currentTask.backupType }}</strong></div>
             <div class="stat-mini"><span>开始</span><strong>{{ formatDateTime(currentTask.startTime) }}</strong></div>
           </div>
+          <p v-if="currentTask && (currentTask.status === 'RUNNING' || currentTask.status === 'PENDING')" class="status-hint">
+            备份中，请稍候，状态会自动刷新。
+          </p>
           <el-empty v-else description="无活跃任务" :image-size="60" />
         </section>
 
@@ -364,6 +430,7 @@ onMounted(() => {
 .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .stat-mini { background: #f8fafc; padding: 12px; border-radius: 8px; font-size: 13px; }
 .stat-mini span { color: #64748b; margin-right: 8px; }
+.status-hint { margin: 12px 2px 0; color: #a16207; font-size: 13px; }
 
 .modern-table { --el-table-header-bg-color: #f8fafc; }
 .file-name { font-weight: 600; }

@@ -151,7 +151,7 @@ public class GlobalExceptionHandler {
                 }
                 log.error("Servlet包装异常: {}", e.getMessage(), e);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(ApiResponse.error("INTERNAL_ERROR", e.getMessage() != null ? e.getMessage() : "服务器内部错误"));
+                                .body(ApiResponse.error("INTERNAL_ERROR", "服务器内部错误"));
         }
     
     /**
@@ -170,7 +170,7 @@ public class GlobalExceptionHandler {
                 }
         log.error("运行时异常: {}", e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("INTERNAL_ERROR", e.getMessage() != null ? e.getMessage() : "服务器内部错误"));
+                .body(ApiResponse.error("INTERNAL_ERROR", "服务器内部错误"));
     }
     
     /**
@@ -180,6 +180,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<String>> handleException(Exception e) {
         log.error("未知异常: {}", e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("UNKNOWN_ERROR", e.getMessage() != null ? e.getMessage() : "系统异常，请稍后重试"));
+                .body(ApiResponse.error("UNKNOWN_ERROR", "系统异常，请稍后重试"));
     }
 }

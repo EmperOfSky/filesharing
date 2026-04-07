@@ -12,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.validation.Valid;
+import java.util.regex.Pattern;
 
 /**
  * 认证控制器
@@ -21,8 +21,10 @@ import javax.validation.Valid;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class AuthController {
+
+    private static final Pattern STRONG_PASSWORD_PATTERN =
+            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,64}$");
     
     private final UserService userService;
     
@@ -41,9 +43,13 @@ public class AuthController {
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("邮箱格式不正确"));
             }
-            if (request.getPassword() == null || request.getPassword().trim().isEmpty() || request.getPassword().length() < 6 || request.getPassword().length() > 100) {
+            if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
                 return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("密码长度必须在6-100个字符之间"));
+                        .body(ApiResponse.error("密码不能为空"));
+            }
+            if (!STRONG_PASSWORD_PATTERN.matcher(request.getPassword()).matches()) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("密码需8-64位，且包含大小写字母、数字和特殊字符"));
             }
             
             UserResponse response = userService.register(request);
@@ -91,15 +97,6 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error(e.getMessage()));
         }
-    }
-    
-    /**
-     * 调试登录请求 - 检查是否接收到正确的参数
-     */
-    @PostMapping("/debug-login")
-    public ResponseEntity<ApiResponse<String>> debugLogin(@Valid @RequestBody UserLoginRequest request) {
-        log.info("调试登录请求: {}", request);
-        return ResponseEntity.ok(ApiResponse.success("请求已接收", String.format("identifier=%s, password=%s", request.getIdentifier(), "***")));
     }
     
     /**

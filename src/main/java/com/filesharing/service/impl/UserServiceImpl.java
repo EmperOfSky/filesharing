@@ -82,7 +82,7 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
         
         // 生成JWT令牌
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername());
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole().name());
         
         log.info("用户登录成功: {}", user.getUsername());
         

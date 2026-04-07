@@ -58,12 +58,20 @@ public class JwtUtil {
      * 生成JWT令牌
      */
     public String generateToken(Long userId, String username) {
+        return generateToken(userId, username, "USER");
+    }
+
+    /**
+     * 生成JWT令牌（包含角色信息）
+     */
+    public String generateToken(Long userId, String username, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
                 .setSubject(username)
                 .claim("userId", userId)
+                .claim("role", role == null ? "USER" : role)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)
@@ -111,6 +119,15 @@ public class JwtUtil {
     }
 
     /**
+     * 从JWT令牌中获取角色
+     */
+    public String getRoleFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        String role = claims.get("role", String.class);
+        return role == null || role.isBlank() ? "USER" : role;
+    }
+
+    /**
      * 检查JWT令牌是否过期
      */
     public boolean isTokenExpired(String token) {
@@ -124,7 +141,8 @@ public class JwtUtil {
     public String refreshToken(String token) {
         String username = getUsernameFromToken(token);
         Long userId = getUserIdFromToken(token);
-        return generateToken(userId, username);
+        String role = getRoleFromToken(token);
+        return generateToken(userId, username, role);
     }
 
     /**

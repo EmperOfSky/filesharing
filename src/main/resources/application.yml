@@ -1,5 +1,6 @@
 server:
   port: ${HTTPS_PORT:8443}
+  server-header: ""
   http:
     port: ${HTTP_PORT:8080}
   ssl:
@@ -8,6 +9,11 @@ server:
     key-store-password: ${HTTPS_KEY_STORE_PASSWORD:changeit}
     key-store-type: PKCS12
     key-alias: ${HTTPS_KEY_ALIAS:filesharing}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
 
 spring:
   application:
@@ -45,7 +51,7 @@ spring:
   servlet:
     multipart:
       max-file-size: 100MB
-      max-request-size: 100MB
+      max-request-size: 200MB
       enabled: true
 
 # 文件存储配置
@@ -87,10 +93,57 @@ upload:
   chunk:
     max-size: 5242880   # 单分片最大 5MB
   file:
-    max-size: 10737418240  # 单文件最大 10GB
+    max-size: 104857600  # 单文件最大 100MB
   allowed-types-csv: image/jpeg,image/png,image/gif,application/pdf,text/plain,video/mp4,audio/mpeg
   cleanup:
     expire-hours: 24
+
+app:
+  security:
+    cors:
+      allowed-origins:
+        - ${CORS_ORIGIN_1:http://localhost:3000}
+        - ${CORS_ORIGIN_2:http://127.0.0.1:3000}
+    rate-limit:
+      global-per-second: 50
+      endpoint-limits:
+        /api/auth/login: 20
+        /api/upload/**: 20
+        /api/admin/**: 10
+    upload:
+      max-file-size-bytes: 104857600
+      enable-malware-scan: true
+      allowed-extensions:
+        - jpg
+        - jpeg
+        - png
+        - gif
+        - pdf
+        - txt
+        - doc
+        - docx
+        - xls
+        - xlsx
+        - mp4
+        - mp3
+        - zip
+        - rar
+      blocked-extensions:
+        - jsp
+        - jspx
+        - exe
+        - dll
+        - bat
+        - cmd
+        - sh
+        - ps1
+        - php
+        - js
+        - jar
+        - war
+        - vbs
+        - com
+        - msi
 
 # JWT配置
 jwt:
@@ -102,9 +155,9 @@ jwt:
 # 日志配置
 logging:
   level:
-    com.filesharing: DEBUG
+    com.filesharing: INFO
     org.springframework.web: INFO
-    org.springframework.security: DEBUG
+    org.springframework.security: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 

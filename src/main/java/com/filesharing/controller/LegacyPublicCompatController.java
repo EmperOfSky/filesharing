@@ -35,7 +35,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Validated
 public class LegacyPublicCompatController {
 

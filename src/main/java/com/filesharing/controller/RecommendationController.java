@@ -26,7 +26,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/recommendations")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Tag(name = "智能推荐", description = "智能推荐相关API")
 public class RecommendationController {
     

@@ -5,6 +5,7 @@ import com.filesharing.entity.PickupCodeRecord;
 import com.filesharing.exception.BusinessException;
 import com.filesharing.repository.PickupCodeRecordRepository;
 import com.filesharing.security.FileCodeBoxSecurityService;
+import com.filesharing.security.FileUploadSecurityService;
 import com.filesharing.util.FileStorageUtil;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,7 @@ public class FileCodeBoxService {
     private final PickupCodeRecordRepository pickupCodeRecordRepository;
     private final FileCodeBoxProperties properties;
     private final FileCodeBoxSecurityService securityService;
+    private final FileUploadSecurityService fileUploadSecurityService;
     private final FileCodeBoxStorageService storageService;
     private final FileStorageUtil fileStorageUtil;
 
@@ -114,6 +116,8 @@ public class FileCodeBoxService {
         if (file.getSize() > properties.getUploadSize()) {
             throw new BusinessException("FILE_TOO_LARGE", "文件大小超过限制");
         }
+
+        fileUploadSecurityService.validateAndScan(file);
 
         securityService.ensureUploadAllowed(ip);
         ExpirePolicy policy = resolveExpirePolicy(expireValue, expireStyle);
@@ -217,6 +221,8 @@ public class FileCodeBoxService {
         if (file.getSize() != session.fileSize) {
             throw new BusinessException("FILE_SIZE_MISMATCH", "文件大小与初始化声明不一致");
         }
+
+        fileUploadSecurityService.validateAndScan(file);
 
         storageService.saveLocalFile(file, session.relativePath);
         session.uploaded = true;
@@ -487,6 +493,13 @@ public class FileCodeBoxService {
         }
 
         String contentType = detectContentType(session.fileName);
+        fileUploadSecurityService.validateAndScan(
+            session.fileName,
+            mergedBytes.length,
+            contentType,
+            new ByteArrayInputStream(mergedBytes)
+        );
+
         try (ByteArrayInputStream inputStream = new ByteArrayInputStream(mergedBytes)) {
             fileStorageUtil.saveInputStreamAtPath(
                     inputStream,

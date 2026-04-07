@@ -23,7 +23,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/cloud-storage")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class CloudStorageController {
     
     private final CloudStorageService cloudStorageService;

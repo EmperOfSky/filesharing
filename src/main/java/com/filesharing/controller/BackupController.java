@@ -28,7 +28,6 @@ import java.util.concurrent.CompletionException;
 @RestController
 @RequestMapping("/api/backup")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Tag(name = "数据备份", description = "数据备份和恢复管理API")
 public class BackupController {
     

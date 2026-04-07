@@ -213,6 +213,23 @@ const fileService = {
     return extractData(response);
   },
 
+  // 拉取预览二进制内容（携带鉴权头），用于图片/pdf等内嵌展示
+  getPreviewBlob: async (fileId) => {
+    const response = await apiClient.get(`/files/${fileId}/preview`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // 拉取文本预览（用于 doc/docx 等文档）
+  getPreviewText: async (fileId) => {
+    const response = await apiClient.get(`/preview/${fileId}/content`, {
+      params: { type: 'text' },
+      responseType: 'text'
+    });
+    return response.data;
+  },
+
   // 删除文件
   deleteFile: async (fileId) => {
     const response = await apiClient.delete(`/files/${fileId}`);

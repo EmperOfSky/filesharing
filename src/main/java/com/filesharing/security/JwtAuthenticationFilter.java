@@ -34,8 +34,14 @@ public class JwtAuthenticationFilter implements Filter {
                 String token = header.substring(7);
                 if (jwtUtil.validateToken(token)) {
                     String username = jwtUtil.getUsernameFromToken(token);
-                    // 这里简单地把 username 作为 principal，并设置一个空角色
-                    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(username, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+                    String role = jwtUtil.getRoleFromToken(token);
+                    String safeRole = StringUtils.hasText(role) ? role.trim() : "USER";
+                    String normalizedRole = safeRole.startsWith("ROLE_") ? safeRole : "ROLE_" + safeRole;
+                    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                            username,
+                            null,
+                            Collections.singletonList(new SimpleGrantedAuthority(normalizedRole))
+                    );
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
             }
