@@ -39,6 +39,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      provenance: false
+      sbom: false
     depends_on:
       mysql:
         condition: service_healthy
@@ -72,6 +74,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      provenance: false
+      sbom: false
     depends_on:
       backend:
         condition: service_started
