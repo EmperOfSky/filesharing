@@ -120,6 +120,7 @@
 2. 收紧 CORS 允许域名，避免全开放策略。
 3. 挂载持久化卷保存数据库、对象存储与备份目录。
 4. 配置 HTTPS 证书并启用监控告警与定时备份。
+5. 如果部署在阿里云服务器且 Docker 拉取镜像较慢或超时，先配置 Docker 镜像加速器；仓库中提供了 [docker/daemon.json.example](docker/daemon.json.example) 作为参考。
 
 ## 目录结构
 

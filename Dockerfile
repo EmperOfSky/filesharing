@@ -1,11 +1,11 @@
-FROM maven:3.9.9-eclipse-temurin-17 AS builder
+FROM maven:3.9.11-eclipse-temurin-17 AS builder
 WORKDIR /build
 
 COPY pom.xml ./
 COPY src ./src
 RUN mvn -B -DskipTests clean package
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17.0.14_7-jre-jammy
 WORKDIR /app
 
 RUN mkdir -p /app/uploads /app/temp /app/backups
