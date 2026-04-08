@@ -104,6 +104,14 @@ app:
       allowed-origins:
         - ${CORS_ORIGIN_1:http://localhost:3000}
         - ${CORS_ORIGIN_2:http://127.0.0.1:3000}
+        - ${CORS_ORIGIN_3:http://localhost:5173}
+        - ${CORS_ORIGIN_4:http://127.0.0.1:5173}
+      allowed-origin-patterns:
+        - ${CORS_ORIGIN_PATTERN_1:https://filesharing.asia:[*]}
+        - ${CORS_ORIGIN_PATTERN_2:https://*.filesharing.asia:[*]}
+        - ${CORS_ORIGIN_PATTERN_2:http://*.filesharing.asia:[*]}
+        - ${CORS_ORIGIN_PATTERN_3:https://47.106.74.102:[*]}
+        - ${CORS_ORIGIN_PATTERN_4:http://47.106.74.102:[*]}
     rate-limit:
       global-per-second: 50
       endpoint-limits:
