@@ -208,6 +208,162 @@ CREATE TABLE IF NOT EXISTS batch_operations (
   KEY idx_status (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量操作表';
 
+
+-- 创建协作项目表
+CREATE TABLE IF NOT EXISTS collaboration_projects (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  project_name VARCHAR(100) NOT NULL,
+  description VARCHAR(500),
+  owner_id BIGINT NOT NULL,
+  status ENUM('ACTIVE', 'ARCHIVED', 'CLOSED') DEFAULT 'ACTIVE',
+  is_public BOOLEAN DEFAULT FALSE,
+  cover_image VARCHAR(500),
+  tags VARCHAR(200),
+  member_count INT DEFAULT 1,
+  file_count INT DEFAULT 0,
+  last_activity DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+  KEY idx_owner_id (owner_id),
+  KEY idx_status (status),
+  KEY idx_is_public (is_public)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='协作项目表';
+
+-- 创建项目成员表
+CREATE TABLE IF NOT EXISTS project_members (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  role ENUM('OWNER', 'ADMIN', 'MEMBER', 'VIEWER') DEFAULT 'MEMBER',
+  status ENUM('ACTIVE', 'INACTIVE', 'LEFT') DEFAULT 'ACTIVE',
+  invite_status ENUM('PENDING', 'ACCEPTED', 'REJECTED') DEFAULT 'ACCEPTED',
+  invited_by BIGINT,
+  joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_activity DATETIME,
+  permissions TEXT,
+  FOREIGN KEY (project_id) REFERENCES collaboration_projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE KEY uk_project_user (project_id, user_id),
+  KEY idx_project_id (project_id),
+  KEY idx_user_id (user_id),
+  KEY idx_role (role),
+  KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='项目成员表';
+
+-- 创建协作文档表
+CREATE TABLE IF NOT EXISTS collaborative_documents (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  document_name VARCHAR(200) NOT NULL,
+  content TEXT,
+  document_type ENUM('TEXT', 'MARKDOWN', 'WIKI') DEFAULT 'TEXT',
+  created_by BIGINT NOT NULL,
+  last_edited_by BIGINT,
+  last_edited_at DATETIME,
+  version INT DEFAULT 1,
+  is_locked BOOLEAN DEFAULT FALSE,
+  locked_by BIGINT,
+  locked_at DATETIME,
+  view_count INT DEFAULT 0,
+  comment_count INT DEFAULT 0,
+  status ENUM('DRAFT', 'PUBLISHED', 'ARCHIVED') DEFAULT 'DRAFT',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES collaboration_projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (last_edited_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (locked_by) REFERENCES users(id) ON DELETE SET NULL,
+  KEY idx_project_id (project_id),
+  KEY idx_created_by (created_by),
+  KEY idx_last_edited_by (last_edited_by),
+  KEY idx_status (status),
+  KEY idx_is_locked (is_locked)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='协作文档表';
+
+-- 创建协作文档快照表
+CREATE TABLE IF NOT EXISTS collaborative_document_snapshots (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  document_id BIGINT NOT NULL,
+  version_number INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content TEXT,
+  commit_message VARCHAR(500),
+  created_by BIGINT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_id) REFERENCES collaborative_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE KEY uk_document_version (document_id, version_number),
+  KEY idx_document_id (document_id),
+  KEY idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='协作文档快照表';
+
+-- 创建评论表
+CREATE TABLE IF NOT EXISTS comments (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  file_id BIGINT,
+  author_id BIGINT NOT NULL,
+  content TEXT,
+  parent_id BIGINT,
+  comment_type ENUM('FILE_COMMENT', 'PROJECT_COMMENT', 'DISCUSSION', 'QUESTION', 'SUGGESTION') DEFAULT 'DISCUSSION',
+  is_resolved BOOLEAN DEFAULT FALSE,
+  resolved_at DATETIME,
+  resolved_by BIGINT,
+  like_count INT DEFAULT 0,
+  dislike_count INT DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES collaboration_projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE SET NULL,
+  FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+  KEY idx_project_id (project_id),
+  KEY idx_file_id (file_id),
+  KEY idx_author_id (author_id),
+  KEY idx_parent_id (parent_id),
+  KEY idx_comment_type (comment_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论表';
+
+-- 创建文档块表
+CREATE TABLE IF NOT EXISTS document_blocks (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  document_id BIGINT NOT NULL,
+  content TEXT,
+  order_index INT NOT NULL,
+  locked_by_user_id BIGINT,
+  locked_at DATETIME,
+  version INT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_id) REFERENCES collaborative_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (locked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  KEY idx_document_id (document_id),
+  KEY idx_order_index (order_index),
+  KEY idx_locked_by_user_id (locked_by_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档块表';
+
+-- 创建文档协作者关联表
+CREATE TABLE IF NOT EXISTS document_editors (
+  document_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  PRIMARY KEY (document_id, user_id),
+  FOREIGN KEY (document_id) REFERENCES collaborative_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  KEY idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档协作者关联表';
+
+-- 创建文档标签表
+CREATE TABLE IF NOT EXISTS document_tags (
+  document_id BIGINT NOT NULL,
+  tag VARCHAR(100) NOT NULL,
+  PRIMARY KEY (document_id, tag),
+  FOREIGN KEY (document_id) REFERENCES collaborative_documents(id) ON DELETE CASCADE,
+  KEY idx_tag (tag)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档标签表';
+
+
 -- 创建索引以优化查询
 CREATE INDEX idx_files_uploader_created ON files(uploader_id, created_at);
 CREATE INDEX idx_files_folder_created ON files(folder_id, created_at);
