@@ -99,7 +99,7 @@ interface FileCodeBoxAdminConfigUpdatePayload {
 }
 
 class FileCodeBoxService {
-  async shareText(text: string, expireValue = 1, expireStyle = 'day'): Promise<FileCodeBoxShareResult> {
+  async shareText(text: string, expireValue = 1, expireStyle = 'hour'): Promise<FileCodeBoxShareResult> {
     const body = new URLSearchParams()
     body.set('text', text)
     body.set('expire_value', String(expireValue))
@@ -109,7 +109,7 @@ class FileCodeBoxService {
     })
   }
 
-  async shareFile(file: File, expireValue = 1, expireStyle = 'day'): Promise<FileCodeBoxShareResult> {
+  async shareFile(file: File, expireValue = 1, expireStyle = 'hour'): Promise<FileCodeBoxShareResult> {
     const form = new FormData()
     form.append('file', file)
     form.append('expire_value', String(expireValue))
@@ -121,7 +121,7 @@ class FileCodeBoxService {
     return http.post<FileCodeBoxSelectResult>('/public/share/select', { code })
   }
 
-  async initPresignUpload(fileName: string, fileSize: number, expireValue = 1, expireStyle = 'day'): Promise<FileCodeBoxPresignInitResult> {
+  async initPresignUpload(fileName: string, fileSize: number, expireValue = 1, expireStyle = 'hour'): Promise<FileCodeBoxPresignInitResult> {
     return http.post<FileCodeBoxPresignInitResult>('/public/presign/upload/init', {
       file_name: fileName,
       file_size: fileSize,
@@ -136,7 +136,7 @@ class FileCodeBoxService {
     return http.put<FileCodeBoxShareResult>(`/public/presign/upload/proxy/${uploadId}`, form)
   }
 
-  async confirmPresignUpload(uploadId: string, expireValue = 1, expireStyle = 'day'): Promise<FileCodeBoxShareResult> {
+  async confirmPresignUpload(uploadId: string, expireValue = 1, expireStyle = 'hour'): Promise<FileCodeBoxShareResult> {
     return http.post<FileCodeBoxShareResult>(`/public/presign/upload/confirm/${uploadId}`, {
       expire_value: expireValue,
       expire_style: expireStyle
@@ -148,7 +148,7 @@ class FileCodeBoxService {
     fileSize: number,
     chunkSize = 5 * 1024 * 1024,
     expireValue = 1,
-    expireStyle = 'day'
+    expireStyle = 'hour'
   ): Promise<FileCodeBoxChunkInitResult> {
     return http.post<FileCodeBoxChunkInitResult>('/chunk/upload/init', {
       file_name: fileName,
@@ -169,7 +169,7 @@ class FileCodeBoxService {
     return http.get<FileCodeBoxChunkStatusResult>(`/chunk/upload/status/${uploadId}`)
   }
 
-  async completeChunkUpload(uploadId: string, expireValue = 1, expireStyle = 'day'): Promise<FileCodeBoxShareResult> {
+  async completeChunkUpload(uploadId: string, expireValue = 1, expireStyle = 'hour'): Promise<FileCodeBoxShareResult> {
     return http.post<FileCodeBoxShareResult>(`/chunk/upload/complete/${uploadId}`, {
       expire_value: expireValue,
       expire_style: expireStyle

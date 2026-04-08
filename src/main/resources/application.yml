@@ -99,6 +99,17 @@ upload:
     expire-hours: 24
 
 app:
+  bootstrap:
+    admin:
+      enabled: true
+      username: admin1
+      password: admin1
+      nickname: 系统管理员
+      email: admin1@gmail.com
+      reset-password-on-startup: true
+  monitoring:
+    disk-space-check-path: ${DISK_SPACE_CHECK_PATH:./uploads/}
+    disk-space-min-free-bytes: ${DISK_SPACE_MIN_FREE_BYTES:1073741824}
   security:
     cors:
       allowed-origins:

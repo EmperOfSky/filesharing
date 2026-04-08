@@ -46,7 +46,7 @@ public class FileCodeBoxController {
     @PostMapping("/share/text")
     public ResponseEntity<ApiResponse<Map<String, Object>>> shareText(@RequestParam("text") String text,
                                                                       @RequestParam(value = "expire_value", defaultValue = "1") Integer expireValue,
-                                                                      @RequestParam(value = "expire_style", defaultValue = "day") String expireStyle,
+                                                                      @RequestParam(value = "expire_style", defaultValue = "hour") String expireStyle,
                                                                       HttpServletRequest request) {
         Long uploaderId = resolveUploaderId(request);
         Map<String, Object> detail = fileCodeBoxService.shareText(
@@ -62,7 +62,7 @@ public class FileCodeBoxController {
     @PostMapping("/share/file")
     public ResponseEntity<ApiResponse<Map<String, Object>>> shareFile(@RequestParam("file") MultipartFile file,
                                                                       @RequestParam(value = "expire_value", defaultValue = "1") Integer expireValue,
-                                                                      @RequestParam(value = "expire_style", defaultValue = "day") String expireStyle,
+                                                                      @RequestParam(value = "expire_style", defaultValue = "hour") String expireStyle,
                                                                       HttpServletRequest request) throws Exception {
         Long uploaderId = resolveUploaderId(request);
         Map<String, Object> detail = fileCodeBoxService.shareFile(

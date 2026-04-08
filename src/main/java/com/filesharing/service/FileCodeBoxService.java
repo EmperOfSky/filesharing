@@ -50,8 +50,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Transactional
 public class FileCodeBoxService {
 
-    private static final String STRING_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    private static final int PICKUP_CODE_LENGTH = 32;
+    private static final String PICKUP_CODE_CHARS = "0123456789";
+    private static final int PICKUP_CODE_LENGTH = 8;
+    private static final int FIXED_LINK_EXPIRE_HOURS = 1;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final PickupCodeRecordRepository pickupCodeRecordRepository;
@@ -911,30 +912,23 @@ public class FileCodeBoxService {
         String style = normalizeExpireStyle(expireStyle);
         int value = expireValue == null ? 1 : expireValue;
 
-        if (!"forever".equals(style) && value <= 0) {
+        if ("count".equals(style) && value <= 0) {
             throw new BusinessException("INVALID_EXPIRE_VALUE", "过期时间值必须大于0");
         }
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expireAt;
+        LocalDateTime expireAt = now.plusHours(FIXED_LINK_EXPIRE_HOURS);
         int expiredCount = -1;
 
         switch (style) {
-            case "day":
-                expireAt = now.plusDays(value);
-                break;
-            case "hour":
-                expireAt = now.plusHours(value);
-                break;
-            case "minute":
-                expireAt = now.plusMinutes(value);
-                break;
             case "count":
-                expireAt = now.plusDays(1);
                 expiredCount = value;
                 break;
+            case "day":
+            case "hour":
+            case "minute":
             case "forever":
-                expireAt = null;
+                // 统一固定为 1 小时过期，访问次数限制沿用原逻辑。
                 break;
             default:
                 throw new BusinessException("INVALID_EXPIRE_STYLE", "不支持的过期策略");
@@ -952,7 +946,7 @@ public class FileCodeBoxService {
     }
 
     private String normalizeExpireStyle(String expireStyle) {
-        String style = (expireStyle == null || expireStyle.isBlank()) ? "day" : expireStyle.trim().toLowerCase(Locale.ROOT);
+        String style = (expireStyle == null || expireStyle.isBlank()) ? "hour" : expireStyle.trim().toLowerCase(Locale.ROOT);
         if (!properties.getExpireStyles().contains(style)) {
             throw new BusinessException("INVALID_EXPIRE_STYLE", "过期时间类型错误");
         }
@@ -961,7 +955,7 @@ public class FileCodeBoxService {
 
     private String generateUniqueCode(String expireStyle) {
         for (int i = 0; i < 20; i++) {
-            String candidate = randomCode(PICKUP_CODE_LENGTH, STRING_CHARS);
+            String candidate = randomCode(PICKUP_CODE_LENGTH, PICKUP_CODE_CHARS);
             if (!pickupCodeRecordRepository.existsByCode(candidate)) {
                 return candidate;
             }

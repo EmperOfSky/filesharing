@@ -53,7 +53,7 @@ public class LegacyPublicCompatController {
     @PostMapping({"/share/text", "/share/text/"})
     public ResponseEntity<Map<String, Object>> shareText(@RequestParam("text") String text,
                                                          @RequestParam(value = "expire_value", defaultValue = "1") Integer expireValue,
-                                                         @RequestParam(value = "expire_style", defaultValue = "day") String expireStyle,
+                                                         @RequestParam(value = "expire_style", defaultValue = "hour") String expireStyle,
                                                          HttpServletRequest request) {
         Long uploaderId = resolveUploaderId(request);
         Map<String, Object> detail = fileCodeBoxService.shareText(
@@ -69,7 +69,7 @@ public class LegacyPublicCompatController {
     @PostMapping({"/share/file", "/share/file/"})
             public ResponseEntity<Map<String, Object>> shareFile(@RequestParam("file") MultipartFile file,
                                      @RequestParam(value = "expire_value", defaultValue = "1") Integer expireValue,
-                                     @RequestParam(value = "expire_style", defaultValue = "day") String expireStyle,
+                         @RequestParam(value = "expire_style", defaultValue = "hour") String expireStyle,
                                      HttpServletRequest request) throws Exception {
         Long uploaderId = resolveUploaderId(request);
         Map<String, Object> detail = fileCodeBoxService.shareFile(

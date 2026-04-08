@@ -2,6 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+// 导入缺失的图标
+import { 
+  UploadFilled, Search, Refresh, Delete, Folder, 
+  Document, Tickets, Monitor, Picture, VideoCamera, 
+  Box, Memo, View, Download, Share, CircleCheckFilled 
+} from '@element-plus/icons-vue'
 import { useFileStore } from '@/stores/file'
 import fileService from '@/services/fileService'
 import UiStatCard from '@/components/ui/UiStatCard.vue'
@@ -19,6 +25,7 @@ const shareDialogVisible = ref(false)
 const shareSubmitting = ref(false)
 const currentShareFile = ref<any | null>(null)
 const shareResult = ref<any | null>(null)
+const shareLinkInputRef = ref<any | null>(null)
 const shareForm = ref({
   title: '',
   description: '',
@@ -39,7 +46,7 @@ const breadcrumbItems = computed(() => {
   return items
 })
 
-const mergedList = computed(() =>[
+const mergedList = computed(() => [
   ...fileStore.currentFolders.map((folder) => ({
     ...folder,
     displayName: folder.name,
@@ -78,7 +85,7 @@ const beforeUpload = (file: File) => {
 
 const formatFileSize = (bytes: number) => {
   if (!bytes || bytes <= 0) return '0 B'
-  const units =['B', 'KB', 'MB', 'GB', 'TB']
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
   const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
   return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 2)} ${units[index]}`
 }
@@ -91,26 +98,26 @@ const formatDate = (dateString?: string) => {
 }
 
 const getFileIcon = (extension?: string) => {
-  const iconMap: Record<string, string> = {
-    pdf: 'Document',
-    doc: 'Document',
-    docx: 'Document',
-    xls: 'Tickets',
-    xlsx: 'Tickets',
-    ppt: 'Monitor',
-    pptx: 'Monitor',
-    jpg: 'Picture',
-    jpeg: 'Picture',
-    png: 'Picture',
-    gif: 'Picture',
-    mp4: 'VideoCamera',
-    avi: 'VideoCamera',
-    mov: 'VideoCamera',
-    zip: 'Box',
-    rar: 'Box',
-    txt: 'Memo'
+  const iconMap: Record<string, any> = {
+    pdf: Document,
+    doc: Document,
+    docx: Document,
+    xls: Tickets,
+    xlsx: Tickets,
+    ppt: Monitor,
+    pptx: Monitor,
+    jpg: Picture,
+    jpeg: Picture,
+    png: Picture,
+    gif: Picture,
+    mp4: VideoCamera,
+    avi: VideoCamera,
+    mov: VideoCamera,
+    zip: Box,
+    rar: Box,
+    txt: Memo
   }
-  return iconMap[String(extension || '').toLowerCase()] || 'Document'
+  return iconMap[String(extension || '').toLowerCase()] || Document
 }
 
 const loadFileData = async () => {
@@ -153,9 +160,6 @@ const onFileSelected = async (event: Event) => {
     })
 
     ElMessage.success('文件上传完成')
-    if (response?.sha256) {
-      ElMessage.info(`SHA-256: ${response.sha256}`)
-    }
     await loadFileData()
   } catch (error: any) {
     const message = error?.response?.data?.message || error?.message || '分片上传失败'
@@ -229,14 +233,15 @@ const handleDelete = async (row: any) => {
 
 const handleCreateFolder = async () => {
   try {
-    const folderName = await ElMessageBox.prompt('请输入新文件夹名称', '新建文件夹', {
+    const { value: folderName } = await ElMessageBox.prompt('请输入新文件夹名称', '新建文件夹', {
       confirmButtonText: '创建',
-      cancelButtonText: '取消'
+      cancelButtonText: '取消',
+      inputPlaceholder: '文件夹名称'
     })
 
-    if (!folderName.value) return
+    if (!folderName) return
 
-    await fileStore.createFolder(folderName.value)
+    await fileStore.createFolder(folderName)
     ElMessage.success('文件夹创建成功')
     await loadFileData()
   } catch (error: any) {
@@ -262,18 +267,46 @@ const openShareDialog = (row: any) => {
 
 const normalizeShareLink = (link: string) => {
   if (!link) return ''
-  try {
-    const parsed = new URL(link)
-    if (parsed.pathname.startsWith('/s/')) {
-      return `${window.location.origin}${parsed.pathname}`
+  if (link.startsWith('http')) return link
+  const base = window.location.origin
+  return link.startsWith('/') ? `${base}${link}` : `${base}/${link}`
+}
+
+/**
+ * 修复后的核心复制函数
+ */
+const copyTextToClipboard = async (text: string) => {
+  if (!text) return false
+
+  // 1. 尝试现代 Clipboard API (仅 HTTPS 支持)
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch (e) {
+      console.warn('Modern clipboard API failed, falling back...')
     }
-    return link
-  } catch {
-    if (link.startsWith('/s/')) {
-      return `${window.location.origin}${link}`
-    }
-    return link
   }
+
+  // 2. 备选方案：创建临时文本域 (兼容 HTTP 和旧浏览器)
+  const textArea = document.createElement("textarea")
+  textArea.value = text
+  textArea.style.position = "fixed"
+  textArea.style.left = "-9999px"
+  textArea.style.top = "0"
+  document.body.appendChild(textArea)
+  textArea.focus()
+  textArea.select()
+  
+  let successful = false
+  try {
+    successful = document.execCommand('copy')
+  } catch (err) {
+    successful = false
+  }
+  
+  document.body.removeChild(textArea)
+  return successful
 }
 
 const createShortShareLink = async () => {
@@ -288,7 +321,7 @@ const createShortShareLink = async () => {
     let expireTime: string | null = null
     if (shareForm.value.expireHours > 0) {
       const date = new Date(Date.now() + shareForm.value.expireHours * 60 * 60 * 1000)
-      expireTime = date.toISOString().slice(0, 19)
+      expireTime = date.toISOString()
     }
 
     const data = await fileService.getFileShareLink(currentShareFile.value.id, {
@@ -320,11 +353,12 @@ const copyShareLink = async () => {
     return
   }
 
-  try {
-    await navigator.clipboard.writeText(link)
-    ElMessage.success('短链已复制')
-  } catch {
-    ElMessage.error('复制失败，请手动复制')
+  const success = await copyTextToClipboard(link)
+  if (success) {
+    ElMessage.success('短链已复制到剪贴板')
+  } else {
+    // 终极方案：手动输入框
+    window.prompt('自动复制失败，请手动复制：', link)
   }
 }
 
@@ -352,7 +386,7 @@ onMounted(() => {
               分享管理
             </el-button>
           </div>
-          <!-- 上传进度条优化展示 -->
+          <!-- 上传进度条 -->
           <div v-if="uploading" class="upload-progress-wrap">
             <div class="progress-info">
               <span>文件上传中...</span>
@@ -372,9 +406,8 @@ onMounted(() => {
       </div>
     </header>
 
-    <!-- 主体内容卡片：文件列表与操作 -->
+    <!-- 主体内容卡片 -->
     <main class="workspace-main base-card">
-      <!-- 操作控制栏 -->
       <div class="toolbar">
         <div class="toolbar-left">
           <el-breadcrumb separator="/" class="modern-breadcrumb">
@@ -418,7 +451,7 @@ onMounted(() => {
       <div class="table-container">
         <el-table
           :data="visibleList"
-          :loading="loading"
+          v-loading="loading"
           style="width: 100%"
           class="modern-table"
           @row-dblclick="handleRowEnter"
@@ -435,7 +468,9 @@ onMounted(() => {
             <template #default="{ row }">
               <div class="file-item">
                 <div class="file-icon" :class="{ 'is-folder': row.isFolder }">
-                  <el-icon><component :is="row.isFolder ? 'Folder' : getFileIcon(row.extension)" /></el-icon>
+                  <el-icon>
+                    <component :is="row.isFolder ? Folder : getFileIcon(row.extension)" />
+                  </el-icon>
                 </div>
                 <div class="file-info">
                   <span class="file-name">{{ row.name || row.originalName }}</span>
@@ -490,7 +525,7 @@ onMounted(() => {
       </div>
     </main>
 
-    <!-- 弹窗样式优化 -->
+    <!-- 分享弹窗 -->
     <el-dialog v-model="shareDialogVisible" title="🌟 创建专属短链分享" width="560px" class="modern-dialog" destroy-on-close>
       <div class="dialog-subtitle">分享当前文件：<span class="highlight">{{ currentShareFile?.originalName || '-' }}</span></div>
       
@@ -549,7 +584,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 全局变量与底色设定 */
 .modern-workspace {
   --primary-color: #0ea5e9;
   --primary-light: #e0f2fe;
@@ -563,7 +597,7 @@ onMounted(() => {
   --border-color: #e2e8f0;
   
   background-color: var(--bg-page);
-  min-height: calc(100vh - 60px); /* 假设有顶导，没有则改为 100vh */
+  min-height: calc(100vh - 60px);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -571,22 +605,16 @@ onMounted(() => {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* 隐藏的文件输入框 */
-.hidden-file-input {
-  display: none;
-}
+.hidden-file-input { display: none; }
 
-/* 通用卡片样式 */
 .base-card {
   background: var(--bg-card);
   border-radius: 20px;
   box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.03), 0 2px 8px -2px rgba(0, 0, 0, 0.02);
   border: 1px solid rgba(226, 232, 240, 0.6);
   padding: 32px;
-  transition: box-shadow 0.3s ease;
 }
 
-/* 顶部 Header */
 .header-content {
   display: flex;
   justify-content: space-between;
@@ -594,10 +622,7 @@ onMounted(() => {
   gap: 40px;
 }
 
-.header-intro {
-  flex: 1;
-  max-width: 600px;
-}
+.header-intro { flex: 1; max-width: 600px; }
 
 .kicker-tag {
   display: inline-block;
@@ -615,14 +640,9 @@ onMounted(() => {
   font-weight: 700;
   color: var(--text-main);
   margin: 0 0 12px 0;
-  letter-spacing: -0.5px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+.header-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
 .header-stats {
   display: grid;
@@ -631,7 +651,6 @@ onMounted(() => {
   min-width: 320px;
 }
 
-/* 进度条优化 */
 .upload-progress-wrap {
   margin-top: 24px;
   background: #f1f5f9;
@@ -645,18 +664,10 @@ onMounted(() => {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 8px;
-  font-weight: 500;
 }
 
-/* 主体区域 */
-.workspace-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 24px;
-}
+.workspace-main { flex: 1; display: flex; flex-direction: column; padding: 24px; }
 
-/* 控制台栏 */
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -666,86 +677,49 @@ onMounted(() => {
   border-bottom: 1px solid var(--border-color);
 }
 
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
+.toolbar-right { display: flex; align-items: center; gap: 16px; }
 
-.search-input {
-  width: 280px;
-}
+.search-input { width: 280px; }
+
 :deep(.search-input .el-input__wrapper) {
   border-radius: 20px;
   background: #f8fafc;
   box-shadow: none !important;
   border: 1px solid transparent;
-  transition: all 0.3s ease;
-}
-:deep(.search-input .el-input__wrapper.is-focus) {
-  background: #fff;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px var(--primary-light) !important;
 }
 
-.action-icons {
-  display: flex;
-  gap: 8px;
-}
+.action-icons { display: flex; gap: 8px; }
 
-/* 面包屑美化 */
 .modern-breadcrumb .breadcrumb-item {
   font-size: 15px;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.2s;
   padding: 4px 8px;
   border-radius: 6px;
 }
-.modern-breadcrumb .breadcrumb-item:hover {
-  color: var(--primary-color);
-  background: var(--primary-light);
-}
+
 .modern-breadcrumb .breadcrumb-item.is-active {
   color: var(--text-main);
   font-weight: 600;
   cursor: default;
-  background: none;
 }
 
-/* 表格深度定制 (覆写 Element Plus 默认样式) */
-.table-container {
-  flex: 1;
-}
+.table-container { flex: 1; }
+
 .modern-table {
   --el-table-border-color: transparent;
   --el-table-header-bg-color: #f8fafc;
-  --el-table-row-hover-bg-color: #f1f5f9;
 }
+
 :deep(.el-table th.el-table__cell) {
   font-weight: 600;
   color: var(--text-muted);
   font-size: 13px;
-  padding: 12px 0;
-}
-:deep(.el-table td.el-table__cell) {
-  padding: 16px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-:deep(.el-table__row) {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-:deep(.el-table__row:hover) {
-  transform: translateY(-1px);
 }
 
-/* 列表文件行视觉 */
-.file-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
+.file-item { display: flex; align-items: center; gap: 16px; }
+
 .file-icon {
   width: 44px;
   height: 44px;
@@ -757,95 +731,25 @@ onMounted(() => {
   background: var(--primary-light);
   color: var(--primary-color);
 }
+
 .file-icon.is-folder {
   background: var(--folder-light);
   color: var(--folder-color);
 }
-.file-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.file-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-main);
-  transition: color 0.2s;
-}
-.file-item:hover .file-name {
-  color: var(--primary-color);
-}
-.file-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.text-secondary {
-  color: var(--text-muted);
-  font-size: 14px;
-}
+
+.file-info { display: flex; flex-direction: column; gap: 4px; }
+
+.file-name { font-size: 14px; font-weight: 600; color: var(--text-main); }
+
 .row-actions {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
   opacity: 0.3;
-  transition: opacity 0.3s ease;
-}
-:deep(.el-table__row:hover) .row-actions {
-  opacity: 1;
+  transition: opacity 0.3s;
 }
 
-.empty-state {
-  padding: 60px 0;
-}
-
-/* 弹窗及表单优化 */
-:deep(.modern-dialog) {
-  border-radius: 20px;
-  overflow: hidden;
-}
-:deep(.modern-dialog .el-dialog__header) {
-  background: #f8fafc;
-  margin-right: 0;
-  padding: 24px;
-  border-bottom: 1px solid var(--border-color);
-}
-:deep(.modern-dialog .el-dialog__title) {
-  font-weight: 700;
-  font-size: 18px;
-}
-:deep(.modern-dialog .el-dialog__body) {
-  padding: 24px;
-}
-
-.dialog-subtitle {
-  margin-bottom: 20px;
-  font-size: 14px;
-  color: var(--text-muted);
-  padding: 12px 16px;
-  background: #f1f5f9;
-  border-radius: 8px;
-}
-.dialog-subtitle .highlight {
-  color: var(--primary-color);
-  font-weight: 600;
-}
-
-.modern-form .form-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-}
-.modern-form .flex-1 {
-  flex: 1;
-}
-.full-width {
-  width: 100%;
-}
-.flex-center-y {
-  display: flex;
-  align-items: center;
-  height: 32px;
-}
+:deep(.el-table__row:hover) .row-actions { opacity: 1; }
 
 .share-result-card {
   margin-top: 24px;
@@ -854,6 +758,7 @@ onMounted(() => {
   background: #ecfdf5;
   border: 1px solid #a7f3d0;
 }
+
 .result-header {
   display: flex;
   align-items: center;
@@ -863,28 +768,15 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
-/* 响应式调整 */
+.modern-form .form-row { display: flex; gap: 16px; align-items: flex-end; }
+.modern-form .flex-1 { flex: 1; }
+.full-width { width: 100%; }
+.flex-center-y { display: flex; align-items: center; height: 32px; }
+
 @media (max-width: 900px) {
-  .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .header-stats {
-    width: 100%;
-    grid-template-columns: 1fr 1fr;
-  }
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-  .toolbar-right {
-    flex-wrap: wrap;
-    justify-content: space-between;
-  }
-  .search-input {
-    width: 100%;
-    flex: 1;
-  }
+  .header-content { flex-direction: column; align-items: flex-start; }
+  .header-stats { width: 100%; grid-template-columns: 1fr 1fr; }
+  .toolbar { flex-direction: column; align-items: stretch; gap: 16px; }
+  .search-input { width: 100%; }
 }
 </style>
