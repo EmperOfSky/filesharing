@@ -39,6 +39,8 @@ public class SecurityHardeningProperties {
     public static class Cors {
         @NotEmpty
         private List<String> allowedOrigins = new ArrayList<>();
+
+        private List<String> allowedOriginPatterns = new ArrayList<>();
     }
 
     @Data
