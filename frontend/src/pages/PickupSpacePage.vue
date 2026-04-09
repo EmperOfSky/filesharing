@@ -9,7 +9,7 @@ const route = useRoute()
 const router = useRouter()
 
 const PICKUP_HISTORY_KEY = 'fcb_pickup_history'
-const PICKUP_CODE_LENGTH = 32
+const PICKUP_CODE_LENGTH = 8
 
 const pickupCode = ref('')
 const selecting = ref(false)
@@ -117,6 +117,10 @@ const selectByCode = async () => {
     ElMessage.warning(`取件码必须为 ${PICKUP_CODE_LENGTH} 位`)
     return
   }
+  if (!/^\d{8}$/.test(code)) {
+    ElMessage.warning('取件码仅支持8位数字')
+    return
+  }
 
   selecting.value = true
 
@@ -182,7 +186,7 @@ onMounted(async () => {
             <el-input
               v-model="pickupCode"
               size="large"
-              placeholder="请输入 32 位取件码..."
+              placeholder="请输入 8 位数字取件码..."
               @keyup.enter="selectByCode"
               class="modern-input"
             />

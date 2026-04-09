@@ -31,7 +31,7 @@ const router = useRouter()
 
 const SEND_HISTORY_KEY = 'fcb_send_history'
 const PICKUP_HISTORY_KEY = 'fcb_pickup_history'
-const PICKUP_CODE_LENGTH = 32
+const PICKUP_CODE_LENGTH = 8
 
 const activeTab = ref<'text' | 'file' | 'chunk' | 'presign' | 'select'>('text')
 
@@ -43,15 +43,15 @@ const sendHistoryVisible = ref(false)
 const pickupHistoryVisible = ref(false)
 
 const textContent = ref('')
-const textExpireStyle = ref('day')
+const textExpireStyle = ref('hour')
 const textExpireValue = ref(1)
 
-const fileExpireStyle = ref('day')
+const fileExpireStyle = ref('hour')
 const fileExpireValue = ref(1)
 const fileToShare = ref<File | null>(null)
 
 const chunkFile = ref<File | null>(null)
-const chunkExpireStyle = ref('day')
+const chunkExpireStyle = ref('hour')
 const chunkExpireValue = ref(1)
 const chunkProgress = ref(0)
 const chunkUploadId = ref('')
@@ -61,7 +61,7 @@ const selected = ref<FileCodeBoxSelectResult | null>(null)
 const selectedIsDownload = ref(false)
 
 const presignFile = ref<File | null>(null)
-const presignExpireStyle = ref('day')
+const presignExpireStyle = ref('hour')
 const presignExpireValue = ref(1)
 const presignMode = ref('')
 const presignUploadUrl = ref('')
@@ -74,7 +74,8 @@ const qrImageData = ref('')
 const qrLoading = ref(false)
 const qrCodeTarget = ref('')
 
-const expireStyles = ['day', 'hour', 'minute', 'count', 'forever']
+const expireStyles = ['hour']
+const showPresignUpload = false
 
 const safeJsonParse = <T>(raw: string | null, fallback: T): T => {
   if (!raw) return fallback
@@ -349,6 +350,10 @@ const onSelectByCode = async () => {
     ElMessage.warning(`取件码必须为 ${PICKUP_CODE_LENGTH} 位`)
     return
   }
+  if (!/^\d{8}$/.test(code)) {
+    ElMessage.warning('取件码仅支持8位数字')
+    return
+  }
 
   try {
     selecting.value = true
@@ -466,7 +471,7 @@ onMounted(() => {
             <el-tab-pane label="文本快传" name="text"></el-tab-pane>
             <el-tab-pane label="文件快传" name="file"></el-tab-pane>
             <el-tab-pane label="分片上传" name="chunk"></el-tab-pane>
-            <el-tab-pane label="直传上传" name="presign"></el-tab-pane>
+            <el-tab-pane v-if="showPresignUpload" label="直传上传" name="presign"></el-tab-pane>
             <el-tab-pane label="取件验证" name="select"></el-tab-pane>
           </el-tabs>
 
@@ -492,7 +497,7 @@ onMounted(() => {
                   </div>
                   <div class="setting-item">
                     <span class="setting-label">有效数值</span>
-                    <el-input-number v-model="textExpireValue" :min="1" class="full-width" />
+                    <el-input-number v-model="textExpireValue" :min="1" :max="1" class="full-width" />
                   </div>
                 </div>
                 <el-button type="primary" size="large" class="submit-btn" :loading="sharing" @click="onTextShare">
@@ -517,7 +522,7 @@ onMounted(() => {
                   </div>
                   <div class="setting-item">
                     <span class="setting-label">有效数值</span>
-                    <el-input-number v-model="fileExpireValue" :min="1" class="full-width" />
+                    <el-input-number v-model="fileExpireValue" :min="1" :max="1" class="full-width" />
                   </div>
                 </div>
                 <el-button type="primary" size="large" class="submit-btn" :loading="sharing" @click="onFileShare">
@@ -542,7 +547,7 @@ onMounted(() => {
                   </div>
                   <div class="setting-item">
                     <span class="setting-label">有效数值</span>
-                    <el-input-number v-model="chunkExpireValue" :min="1" class="full-width" />
+                    <el-input-number v-model="chunkExpireValue" :min="1" :max="1" class="full-width" />
                   </div>
                 </div>
                 <el-button type="primary" size="large" class="submit-btn" :loading="chunkUploading" @click="onChunkShare">
@@ -556,7 +561,7 @@ onMounted(() => {
               </div>
 
               <!-- Presign Share -->
-              <div v-else-if="activeTab === 'presign'" class="form-panel">
+              <div v-else-if="showPresignUpload && activeTab === 'presign'" class="form-panel">
                 <label class="modern-dropzone" :class="{ 'has-file': presignFile }">
                   <input type="file" @change="onPresignFilePicked" hidden />
                   <el-icon class="dropzone-icon"><UploadFilled /></el-icon>
@@ -572,7 +577,7 @@ onMounted(() => {
                   </div>
                   <div class="setting-item">
                     <span class="setting-label">有效数值</span>
-                    <el-input-number v-model="presignExpireValue" :min="1" class="full-width" />
+                    <el-input-number v-model="presignExpireValue" :min="1" :max="1" class="full-width" />
                   </div>
                 </div>
                 <el-button type="primary" size="large" class="submit-btn" :loading="presignUploading" @click="onPresignUpload">
@@ -589,9 +594,9 @@ onMounted(() => {
                 <div class="pickup-input-wrapper">
                   <el-input
                     v-model="pickupCode"
-                    placeholder="请输入 32 位取件码"
+                    placeholder="请输入 8 位数字取件码"
                     size="large"
-                    maxlength="32"
+                    maxlength="8"
                     clearable
                     @keyup.enter="onSelectByCode"
                     class="pickup-input"

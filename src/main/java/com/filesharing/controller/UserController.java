@@ -25,8 +25,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class UserController {
 
-    private static final Pattern STRONG_PASSWORD_PATTERN =
-            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,64}$");
+    private static final Pattern PASSWORD_PATTERN =
+            Pattern.compile("^.{6,100}$");
     
     private final UserService userService;
     private final UserRepository userRepository;
@@ -89,9 +89,9 @@ public class UserController {
                     .body(ApiResponse.error("旧密码和新密码不能为空"));
             }
 
-            if (!STRONG_PASSWORD_PATTERN.matcher(newPassword).matches()) {
+                if (!PASSWORD_PATTERN.matcher(newPassword).matches()) {
                 return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("新密码需8-64位，且包含大小写字母、数字和特殊字符"));
+                    .body(ApiResponse.error("新密码长度至少为6位"));
             }
             
             // 验证旧密码

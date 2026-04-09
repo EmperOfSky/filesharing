@@ -23,8 +23,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private static final Pattern STRONG_PASSWORD_PATTERN =
-            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,64}$");
+    private static final Pattern PASSWORD_PATTERN =
+            Pattern.compile("^.{6,100}$");
     
     private final UserService userService;
     
@@ -47,9 +47,9 @@ public class AuthController {
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("密码不能为空"));
             }
-            if (!STRONG_PASSWORD_PATTERN.matcher(request.getPassword()).matches()) {
+            if (!PASSWORD_PATTERN.matcher(request.getPassword()).matches()) {
                 return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("密码需8-64位，且包含大小写字母、数字和特殊字符"));
+                        .body(ApiResponse.error("密码长度至少为6位"));
             }
             
             UserResponse response = userService.register(request);

@@ -2,10 +2,12 @@ package com.filesharing.monitoring;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.ThreadMXBean;
@@ -31,7 +33,12 @@ public class SystemMonitoringService {
     
     // 性能阈值配置
     private static final double MEMORY_THRESHOLD = 0.85; // 85%内存使用率
-    private static final long DISK_SPACE_THRESHOLD = 1024 * 1024 * 1024; // 1GB剩余空间
+
+    @Value("${app.monitoring.disk-space-check-path:./uploads/}")
+    private String diskSpaceCheckPath;
+
+    @Value("${app.monitoring.disk-space-min-free-bytes:1073741824}")
+    private long diskSpaceMinFreeBytes;
     
     /**
      * 收集系统性能指标
@@ -105,7 +112,7 @@ public class SystemMonitoringService {
             result.getComponents().put("network", networkHealth);
             
             // 计算总体健康状态
-            result.setStatus(calculateOverallHealth(result.getComponents()));
+            result.setStatus(calculateOverallHealth(result.getComponents()).getCode());
             
             // 记录健康状态
             updateHealthStatus(result);
@@ -115,7 +122,7 @@ public class SystemMonitoringService {
             
         } catch (Exception e) {
             log.error("执行健康检查失败", e);
-            result.setStatus(Status.DOWN);
+            result.setStatus(Status.DOWN.getCode());
             result.getComponents().put("system", Health.down().withDetail("error", e.getMessage()).build());
         }
         
@@ -307,17 +314,39 @@ public class SystemMonitoringService {
     }
     
     private Health checkDiskHealth() {
-        // 简化的磁盘健康检查
         try {
-            long freeSpace = Runtime.getRuntime().freeMemory();
-            boolean isHealthy = freeSpace > DISK_SPACE_THRESHOLD;
-            
-            return isHealthy ? 
-                Health.up().withDetail("freeSpace", freeSpace).build() :
-                Health.down().withDetail("freeSpace", freeSpace).withDetail("threshold", DISK_SPACE_THRESHOLD).build();
+            File target = resolveDiskCheckTarget();
+            long usableSpace = target.getUsableSpace();
+            long totalSpace = target.getTotalSpace();
+            long usedSpace = totalSpace > 0 ? totalSpace - target.getFreeSpace() : 0L;
+            boolean isHealthy = usableSpace >= diskSpaceMinFreeBytes;
+
+            Health.Builder builder = isHealthy ? Health.up() : Health.down();
+            return builder
+                .withDetail("path", target.getAbsolutePath())
+                .withDetail("usableSpace", usableSpace)
+                .withDetail("totalSpace", totalSpace)
+                .withDetail("usedSpace", usedSpace)
+                .withDetail("minFreeBytes", diskSpaceMinFreeBytes)
+                .build();
         } catch (Exception e) {
             return Health.down().withDetail("error", e.getMessage()).build();
         }
+    }
+
+    private File resolveDiskCheckTarget() {
+        File configuredPath = new File(diskSpaceCheckPath == null ? "./uploads/" : diskSpaceCheckPath.trim()).getAbsoluteFile();
+        File current = configuredPath;
+
+        while (current != null && !current.exists()) {
+            current = current.getParentFile();
+        }
+
+        if (current != null) {
+            return current;
+        }
+
+        return new File(System.getProperty("user.dir")).getAbsoluteFile();
     }
     
     private Health checkMemoryHealth() {
@@ -467,7 +496,7 @@ public class SystemMonitoringService {
     @Data
     public static class HealthCheckResult {
         private LocalDateTime timestamp;
-        private Status status;
+        private String status;
         private Map<String, Health> components;
     }
     

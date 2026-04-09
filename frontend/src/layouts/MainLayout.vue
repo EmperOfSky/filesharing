@@ -20,78 +20,85 @@ const mobileNavVisible = ref(false)
 
 const isAdmin = computed(() => authStore.user?.role === 'ADMIN')
 
-const navItems = computed<NavItem[]>(() => [
-  {
-    key: 'dashboard',
-    title: '工作台',
-    route: '/dashboard',
-    icon: 'House',
-    match: ['/dashboard']
-  },
-  {
-    key: 'quick-transfer',
-    title: '快传中心',
-    route: '/dashboard/quick-transfer',
-    icon: 'Connection',
-    match: ['/dashboard/quick-transfer']
-  },
-  {
-    key: 'files',
-    title: '文件管理',
-    route: '/dashboard/files',
-    icon: 'FolderOpened',
-    match: ['/dashboard/files']
-  },
-  {
-    key: 'search',
-    title: '搜索',
-    route: '/dashboard/search',
-    icon: 'Search',
-    match: ['/dashboard/search']
-  },
-  {
-    key: 'shares',
-    title: '分享管理',
-    route: '/dashboard/shares',
-    icon: 'Share',
-    match: ['/dashboard/shares']
-  },
-  {
-    key: 'recycle',
-    title: '回收站',
-    route: '/dashboard/recycle-bin',
-    icon: 'Delete',
-    match: ['/dashboard/recycle-bin']
-  },
-  {
-    key: 'recommendation',
-    title: '智能推荐',
-    route: '/dashboard/recommendations',
-    icon: 'Star',
-    match: ['/dashboard/recommendations']
-  },
-  {
-    key: 'collaboration',
-    title: '协作文档',
-    route: '/dashboard/collaboration',
-    icon: 'EditPen',
-    match: ['/dashboard/collaboration']
-  },
-  {
-    key: 'pickup',
-    title: '取件空间',
-    route: '/dashboard/pickup-space',
-    icon: 'FolderChecked',
-    match: ['/dashboard/pickup-space']
-  },
-  {
-    key: 'backup',
-    title: '数据备份',
-    route: '/dashboard/backup',
-    icon: 'Coin',
-    match: ['/dashboard/backup']
+const navItems = computed<NavItem[]>(() => {
+  const items: NavItem[] = [
+    {
+      key: 'dashboard',
+      title: '工作台',
+      route: '/dashboard',
+      icon: 'House',
+      match: ['/dashboard']
+    },
+    {
+      key: 'quick-transfer',
+      title: '快传中心',
+      route: '/dashboard/quick-transfer',
+      icon: 'Connection',
+      match: ['/dashboard/quick-transfer']
+    },
+    {
+      key: 'files',
+      title: '文件管理',
+      route: '/dashboard/files',
+      icon: 'FolderOpened',
+      match: ['/dashboard/files']
+    },
+    {
+      key: 'search',
+      title: '搜索',
+      route: '/dashboard/search',
+      icon: 'Search',
+      match: ['/dashboard/search']
+    },
+    {
+      key: 'shares',
+      title: '分享管理',
+      route: '/dashboard/shares',
+      icon: 'Share',
+      match: ['/dashboard/shares']
+    },
+    {
+      key: 'recycle',
+      title: '回收站',
+      route: '/dashboard/recycle-bin',
+      icon: 'Delete',
+      match: ['/dashboard/recycle-bin']
+    },
+    {
+      key: 'collaboration',
+      title: '协作文档',
+      route: '/dashboard/collaboration',
+      icon: 'EditPen',
+      match: ['/dashboard/collaboration']
+    },
+    {
+      key: 'pickup',
+      title: '取件空间',
+      route: '/dashboard/pickup-space',
+      icon: 'FolderChecked',
+      match: ['/dashboard/pickup-space']
+    },
+    {
+      key: 'backup',
+      title: '数据备份',
+      route: '/dashboard/backup',
+      icon: 'Coin',
+      match: ['/dashboard/backup']
+    }
+  ]
+
+  if (isAdmin.value) {
+    items.push({
+      key: 'system-load',
+      title: '系统负载',
+      route: '/dashboard/system-load',
+      icon: 'Monitor',
+      match: ['/dashboard/system-load']
+    })
   }
-])
+
+  return items
+})
 
 const activeKey = computed(() => {
   const currentPath = route.path

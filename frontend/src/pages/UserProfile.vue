@@ -203,7 +203,6 @@ const loadAccountStats = async () => {
         <div class="header-intro">
           <div class="kicker-tag">Profile Center</div>
           <h1 class="title">个人中心</h1>
-          <p class="description" style="color: var(--fs-text-2); margin-top: 8px;">把账号资料、安全设置和使用概况整合成一个更清晰的个人中心，您可以在这里修改信息及查看统计。</p>
           <div class="hero-badges" style="margin-top: 16px; display: flex; gap: 12px;">
             <span class="hero-badge" style="display: flex; align-items: center; gap: 6px; color: var(--fs-text-2); background: var(--fs-bg-1); padding: 4px 12px; border-radius: 99px; font-size: 13px;">
               <el-icon><User /></el-icon>

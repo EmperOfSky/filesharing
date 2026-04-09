@@ -104,6 +104,12 @@ const router = createRouter({
           component: () => import('@/pages/BackupPage.vue')
         },
         {
+          path: 'system-load',
+          name: 'system-load',
+          component: () => import('@/pages/SystemLoadPage.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
           path: 'collaboration',
           name: 'collaboration-projects',
           component: () => import('@/pages/CollaborationProjectsPage.vue')
@@ -137,7 +143,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
 
   const pickupCode = typeof to.query.code === 'string' ? to.query.code.trim() : ''
@@ -148,10 +154,21 @@ router.beforeEach((to, _from, next) => {
     next({ path: '/pickup-space', query: { code: pickupCode } })
     return
   }
+
+  if (authStore.isAuthenticated && !authStore.user) {
+    try {
+      await authStore.fetchCurrentUser()
+    } catch {
+      next('/login')
+      return
+    }
+  }
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
+    next('/dashboard')
+  } else if (to.meta.requiresAdmin && authStore.user?.role !== 'ADMIN') {
     next('/dashboard')
   } else {
     next()

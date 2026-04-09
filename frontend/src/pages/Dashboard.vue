@@ -231,11 +231,6 @@ onMounted(() => {
               <span>回收站</span>
               <el-icon class="nav-arrow"><ArrowRight /></el-icon>
             </button>
-            <button class="nav-item" @click="go('/dashboard/recommendations')">
-              <div class="nav-icon star-icon"><el-icon><Star /></el-icon></div>
-              <span>推荐资源</span>
-              <el-icon class="nav-arrow"><ArrowRight /></el-icon>
-            </button>
             <button class="nav-item" @click="go('/dashboard/profile')">
               <div class="nav-icon user-icon"><el-icon><User /></el-icon></div>
               <span>个人中心</span>
