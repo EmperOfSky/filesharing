@@ -77,17 +77,18 @@ const navItems = computed<NavItem[]>(() => {
       route: '/dashboard/pickup-space',
       icon: 'FolderChecked',
       match: ['/dashboard/pickup-space']
-    },
-    {
+    }
+  ]
+
+  if (isAdmin.value) {
+    items.push({
       key: 'backup',
       title: '数据备份',
       route: '/dashboard/backup',
       icon: 'Coin',
       match: ['/dashboard/backup']
-    }
-  ]
+    })
 
-  if (isAdmin.value) {
     items.push({
       key: 'system-load',
       title: '系统负载',

@@ -101,7 +101,8 @@ const router = createRouter({
         {
           path: 'backup',
           name: 'backup',
-          component: () => import('@/pages/BackupPage.vue')
+          component: () => import('@/pages/BackupPage.vue'),
+          meta: { requiresAdmin: true }
         },
         {
           path: 'system-load',
