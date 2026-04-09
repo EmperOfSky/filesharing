@@ -340,7 +340,7 @@ onMounted(() => {
       <div class="header-content">
         <div class="header-intro">
           <div class="kicker-tag">File Workspace</div>
-          <h1 class="title">我的文件工作区</h1>
+          <h1 class="title">文件工作区</h1>
           <div class="header-actions">
             <el-button color="#0ea5e9" type="primary" size="large" @click="triggerFileSelect" :disabled="uploading || loading" round>
               <el-icon class="el-icon--left"><UploadFilled /></el-icon> 上传文件

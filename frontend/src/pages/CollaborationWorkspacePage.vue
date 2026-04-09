@@ -110,11 +110,24 @@ const normalizeWsBaseUrl = () => {
     return envWsBase.replace(/\/$/, '')
   }
 
+  const envApiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined
+  if (envApiBase && /^https?:\/\//i.test(envApiBase)) {
+    try {
+      const apiUrl = new URL(envApiBase)
+      const wsProtocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+      return `${wsProtocol}//${apiUrl.host}`
+    } catch {
+      // ignore invalid api base url and fallback
+    }
+  }
+
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const hostname = window.location.hostname
   const currentPort = window.location.port
 
-  const targetPort = (hostname === 'localhost' || hostname === '127.0.0.1')
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1'
+  // 仅在本地开发时把前端端口回退到后端 8080，生产域名保持当前站点端口。
+  const targetPort = (isLocalHost && (!currentPort || currentPort === '3000' || currentPort === '5173' || currentPort === '4173'))
     ? '8080'
     : currentPort
 
@@ -170,7 +183,10 @@ const applyLocalTextChange = (next: string) => {
 }
 
 const handleEditorInput = (value: string) => {
+  // 先回写到受控输入，避免协作连接异常时文本框无法输入。
+  editorContent.value = value
   applyLocalTextChange(value)
+  scheduleAutoSave()
 }
 
 const cleanupYDoc = () => {
@@ -351,6 +367,7 @@ const connectWs = (documentId: number) => {
 
   ws.onerror = () => {
     wsConnected.value = false
+    wsConnecting.value = false
   }
 
   ws.onclose = () => {
