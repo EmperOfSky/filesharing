@@ -94,7 +94,6 @@ upload:
     max-size: 5242880   # 单分片最大 5MB
   file:
     max-size: 104857600  # 单文件最大 100MB
-  allowed-types-csv: image/jpeg,image/png,image/gif,application/pdf,text/plain,video/mp4,audio/mpeg
   cleanup:
     expire-hours: 24
 
@@ -110,6 +109,7 @@ app:
   monitoring:
     disk-space-check-path: ${DISK_SPACE_CHECK_PATH:./uploads/}
     disk-space-min-free-bytes: ${DISK_SPACE_MIN_FREE_BYTES:1073741824}
+    metric-sample-interval-ms: ${MONITORING_METRIC_SAMPLE_INTERVAL_MS:30000}
   security:
     cors:
       allowed-origins:

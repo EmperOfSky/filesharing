@@ -22,7 +22,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping({"/api/search", "/api/files/search"})
+@RequestMapping("/api/search")
 @RequiredArgsConstructor
 public class SearchController {
 

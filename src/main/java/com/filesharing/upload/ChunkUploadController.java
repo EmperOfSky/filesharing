@@ -1,8 +1,10 @@
 package com.filesharing.upload;
 
 import com.filesharing.entity.FileEntity;
+import com.filesharing.entity.Folder;
 import com.filesharing.entity.User;
 import com.filesharing.repository.FileRepository;
+import com.filesharing.repository.FolderRepository;
 import com.filesharing.repository.UserRepository;
 import com.filesharing.security.FileUploadSecurityService;
 import com.filesharing.util.FileStorageUtil;
@@ -28,7 +30,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.Arrays;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.stream.Stream;
@@ -54,10 +55,8 @@ public class ChunkUploadController {
     @Value("${upload.file.max-size:10737418240}") // 默认 10GB
     private long fileMaxSize;
 
-    @Value("${upload.allowed-types-csv:}")
-    private String allowedTypesCsv;
-
     private final FileRepository fileRepository;
+    private final FolderRepository folderRepository;
     private final UserRepository userRepository;
     private final FileStorageUtil fileStorageUtil;
     private final FileUploadSecurityService fileUploadSecurityService;
@@ -164,7 +163,8 @@ public class ChunkUploadController {
     public ResponseEntity<Map<String, String>> completeUpload(
             @RequestParam("uploadId") String uploadId,
             @RequestParam("filename") String filename,
-            @RequestParam(value = "contentType", required = false) String contentType
+            @RequestParam(value = "contentType", required = false) String contentType,
+            @RequestParam(value = "folderId", required = false) Long folderId
     ) throws IOException {
         // 鉴权并解析当前用户
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -219,16 +219,6 @@ public class ChunkUploadController {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "文件大小超出限制: " + fileMaxSize);
         }
 
-        // 校验 MIME 类型（如果前端传入）
-        if (contentType != null && allowedTypesCsv != null && !allowedTypesCsv.isBlank()) {
-            Set<String> allowed = Arrays.stream(allowedTypesCsv.split(","))
-                    .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
-            if (!allowed.isEmpty() && !allowed.contains(contentType)) {
-                try { Files.deleteIfExists(mergedTempFile); } catch (IOException ignored) {}
-                throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "不允许的文件类型: " + contentType);
-            }
-        }
-
         try (InputStream mergedInputForScan = Files.newInputStream(mergedTempFile)) {
             fileUploadSecurityService.validateAndScan(filename, fileSize, contentType, mergedInputForScan);
         }
@@ -250,6 +240,14 @@ public class ChunkUploadController {
         // 保存文件元数据，上传者为当前认证用户
 
         User uploader = uploaderOpt.get();
+        Folder targetFolder = null;
+        if (folderId != null) {
+            targetFolder = folderRepository.findById(folderId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "目标文件夹不存在"));
+            if (targetFolder.getOwner() == null || !uploader.getId().equals(targetFolder.getOwner().getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权上传到该文件夹");
+            }
+        }
 
         FileEntity fe = new FileEntity();
         fe.setStorageName(storageName);
@@ -269,6 +267,7 @@ public class ChunkUploadController {
         fe.setPreviewCount(0);
         fe.setShareCount(0);
         fe.setUploader(uploader);
+        fe.setFolder(targetFolder);
 
         fileRepository.save(fe);
 

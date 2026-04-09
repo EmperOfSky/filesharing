@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -27,6 +27,8 @@ const alerts = ref<MonitoringAlert[]>([])
 const statistics = ref<MonitoringStatistics | null>(null)
 const metricHistory = ref<MetricHistory | null>(null)
 const selectedMetric = ref('heap_memory_usage')
+const AUTO_REFRESH_INTERVAL_MS = 30000
+let autoRefreshTimer: ReturnType<typeof window.setInterval> | null = null
 
 const metricOptions = [
   { label: '堆内存使用率', value: 'heap_memory_usage' },
@@ -160,6 +162,7 @@ const loadMetricHistory = async () => {
 }
 
 const loadData = async () => {
+  if (loading.value) return
   loading.value = true
   try {
     const [systemMetrics, healthCheck, performanceReport, alertResult, stats] = await Promise.all([
@@ -216,6 +219,17 @@ const refreshPage = async () => {
 
 onMounted(() => {
   loadData()
+
+  autoRefreshTimer = window.setInterval(() => {
+    loadData()
+  }, AUTO_REFRESH_INTERVAL_MS)
+})
+
+onUnmounted(() => {
+  if (autoRefreshTimer !== null) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
 })
 </script>
 
@@ -246,6 +260,10 @@ onMounted(() => {
         <div class="status-chip subtle">
           <el-icon><BellFilled /></el-icon>
           <span>开放告警 {{ alertCount }} 条</span>
+        </div>
+        <div class="status-chip subtle">
+          <el-icon><Refresh /></el-icon>
+          <span>自动刷新每 30 秒</span>
         </div>
       </div>
     </header>

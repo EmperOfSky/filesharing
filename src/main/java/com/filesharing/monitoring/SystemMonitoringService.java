@@ -5,12 +5,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.Status;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.ThreadMXBean;
+import java.net.NetworkInterface;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,6 +42,19 @@ public class SystemMonitoringService {
 
     @Value("${app.monitoring.disk-space-min-free-bytes:1073741824}")
     private long diskSpaceMinFreeBytes;
+
+    @PostConstruct
+    public void initMonitoringBaseline() {
+        collectSystemMetrics();
+    }
+
+    /**
+     * 定时采样系统指标，避免仅在页面刷新时才产生采样点。
+     */
+    @Scheduled(fixedDelayString = "${app.monitoring.metric-sample-interval-ms:30000}")
+    public void scheduledMetricSampling() {
+        collectSystemMetrics();
+    }
     
     /**
      * 收集系统性能指标
@@ -71,10 +87,18 @@ public class SystemMonitoringService {
             
             // 系统负载（简化实现）
             metrics.setSystemLoadAverage(getSystemLoadAverage());
+
+            // 补充可用于报告统计的指标
+            double cpuUsage = getCpuUsageRatio(); // 0~1
+            double diskUsagePercent = getDiskUsagePercent(); // 0~100
+            double networkActivePercent = getNetworkActivePercent(); // 0~100
             
             // 记录指标历史
+            recordMetric("cpu_usage", cpuUsage);
             recordMetric("heap_memory_usage", metrics.getHeapMemoryUsage());
             recordMetric("thread_count", metrics.getThreadCount());
+            recordMetric("disk_io", diskUsagePercent);
+            recordMetric("network_traffic", networkActivePercent);
             
             log.debug("系统指标收集完成: 内存使用率={:.2f}%, 线程数={}", 
                 metrics.getHeapMemoryUsage() * 100, metrics.getThreadCount());
@@ -426,6 +450,72 @@ public class SystemMonitoringService {
             return ManagementFactory.getOperatingSystemMXBean().getSystemLoadAverage();
         } catch (Exception e) {
             return -1.0;
+        }
+    }
+
+    private double getCpuUsageRatio() {
+        try {
+            java.lang.management.OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
+            if (osBean instanceof com.sun.management.OperatingSystemMXBean) {
+                double systemCpuLoad = ((com.sun.management.OperatingSystemMXBean) osBean).getSystemCpuLoad();
+                if (systemCpuLoad >= 0) {
+                    return Math.min(Math.max(systemCpuLoad, 0.0), 1.0);
+                }
+            }
+
+            double loadAvg = osBean.getSystemLoadAverage();
+            int processors = Math.max(osBean.getAvailableProcessors(), 1);
+            if (loadAvg >= 0) {
+                return Math.min(Math.max(loadAvg / processors, 0.0), 1.0);
+            }
+        } catch (Exception e) {
+            log.debug("获取CPU使用率失败: {}", e.getMessage());
+        }
+        return 0.0;
+    }
+
+    private double getDiskUsagePercent() {
+        try {
+            File target = resolveDiskCheckTarget();
+            long totalSpace = target.getTotalSpace();
+            if (totalSpace <= 0) {
+                return 0.0;
+            }
+            long usedSpace = totalSpace - target.getUsableSpace();
+            return Math.min(Math.max((usedSpace * 100.0) / totalSpace, 0.0), 100.0);
+        } catch (Exception e) {
+            log.debug("获取磁盘使用率失败: {}", e.getMessage());
+            return 0.0;
+        }
+    }
+
+    private double getNetworkActivePercent() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            if (interfaces == null) {
+                return 0.0;
+            }
+
+            int total = 0;
+            int active = 0;
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface ni = interfaces.nextElement();
+                if (ni == null || ni.isLoopback() || ni.isVirtual()) {
+                    continue;
+                }
+                total++;
+                if (ni.isUp()) {
+                    active++;
+                }
+            }
+
+            if (total == 0) {
+                return 0.0;
+            }
+            return (active * 100.0) / total;
+        } catch (Exception e) {
+            log.debug("获取网络活跃度失败: {}", e.getMessage());
+            return 0.0;
         }
     }
     

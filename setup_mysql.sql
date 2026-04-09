@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS chunk_upload_records (
   KEY idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分块上传记录表';
 
--- 创建操作日志表
+-- 创建访问日志表
 CREATE TABLE IF NOT EXISTS operation_logs (
   id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '日志ID',
   user_id BIGINT COMMENT '用户ID',
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS operation_logs (
   KEY idx_user_id (user_id),
   KEY idx_operation_type (operation_type),
   KEY idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='访问日志表';
 
 -- 创建通知表
 CREATE TABLE IF NOT EXISTS notifications (
@@ -211,19 +211,19 @@ CREATE TABLE IF NOT EXISTS batch_operations (
 
 -- 创建协作项目表
 CREATE TABLE IF NOT EXISTS collaboration_projects (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  project_name VARCHAR(100) NOT NULL,
-  description VARCHAR(500),
-  owner_id BIGINT NOT NULL,
-  status ENUM('ACTIVE', 'ARCHIVED', 'CLOSED') DEFAULT 'ACTIVE',
-  is_public BOOLEAN DEFAULT FALSE,
-  cover_image VARCHAR(500),
-  tags VARCHAR(200),
-  member_count INT DEFAULT 1,
-  file_count INT DEFAULT 0,
-  last_activity DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '协作项目ID',
+  project_name VARCHAR(100) NOT NULL COMMENT '项目名称',
+  description VARCHAR(500) COMMENT '项目描述',
+  owner_id BIGINT NOT NULL COMMENT '项目所有者ID',
+  status ENUM('ACTIVE', 'ARCHIVED', 'CLOSED') DEFAULT 'ACTIVE' COMMENT '项目状态',
+  is_public BOOLEAN DEFAULT FALSE COMMENT '是否公开',
+  cover_image VARCHAR(500) COMMENT '封面图片URL',
+  tags VARCHAR(200) COMMENT '项目标签',
+  member_count INT DEFAULT 1 COMMENT '成员数量',
+  file_count INT DEFAULT 0 COMMENT '文件数量',
+  last_activity DATETIME COMMENT '最后活动时间',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
   KEY idx_owner_id (owner_id),
   KEY idx_status (status),
